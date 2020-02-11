@@ -1,0 +1,14 @@
+# mac
+#numpy==1.16.6
+#opencv-python==4.1.2.30
+#Pillow==6.2.2
+#pytesseract==0.3.1
+
+# ubuntu
+decorator==3.4.0
+numpy==1.16.6
+opencv-python==4.1.1.26
+Pillow==5.4.1
+pytesseract==0.3.1
+PyYAML==3.10
+six==1.5.2
