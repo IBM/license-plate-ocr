@@ -22,10 +22,11 @@ metadata:
 spec:
   containers:
     - name: ubuntu-ocr
-      image: kkbankol/ubuntu-ocr
+      #image: kkbankol/ubuntu-ocr
+      image: kkbankol/ubuntu-ocr:tess4
       imagePullPolicy: Always
       stdin: true
       tty: true
-      command: ["/bin/bash"]
-      # command: ["/usr/bin/python3"]
-      # args: ["ocr_server.py"]
+      #command: ["/bin/bash"]
+      command: ["/usr/bin/python3"]
+      args: ["ocr_server.py"]

@@ -30,8 +30,8 @@ Sign up for a trial account of PowerAI vision [here](https://developer.ibm.com/l
 3. PowerAI Vision "Post Processing" script forwards image and object location to custom server.
 4. Custom server improves image with following steps:
     - Binarisation (Convert image to black and white)
-    - [Edge Detection] (https://docs.opencv.org/2.4/doc/tutorials/imgproc/imgtrans/canny_detector/canny_detector.html)
-    - [Rotation] (https://tesseract-ocr.github.io/tessdoc/ImproveQuality#rotation--deskewing)
+    - [Edge Detection](https://docs.opencv.org/2.4/doc/tutorials/imgproc/imgtrans/canny_detector/canny_detector.html)
+    - [Rotation](https://tesseract-ocr.github.io/tessdoc/ImproveQuality#rotation--deskewing)
     - Border Removal
 5. Custom server runs processed images through OCR library.
 
@@ -66,7 +66,7 @@ curl -sL https://ibm.biz/idt-installer | bash
 
 After completing the steps, click the "Worker Nodes" tab. Take note of the value under "Public IP".
 
-**important!**
+**Important!!**
 Set the external IP address as the URL variable in the [custom.py](custom.py#L52) script.
 
 <img src="https://i.imgur.com/p0gTEfD.png" />

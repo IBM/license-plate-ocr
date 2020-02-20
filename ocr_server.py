@@ -12,6 +12,8 @@ from  scipy import ndimage
 import statistics
 import sys
 from datetime import datetime
+import statistics
+from pytesseract import Output
 # import process_image
 
 class S(BaseHTTPRequestHandler):
@@ -43,12 +45,18 @@ class S(BaseHTTPRequestHandler):
         results = data['results']
         image = np.array(data['image']).astype('uint8')
         # cv2.imwrite("image.png", image)
+        timestamp = datetime.now().strftime("%m%d_%H%M%S")
+        cv2.imwrite(timestamp + '.png', image)
+        f = open('results_' + timestamp + '.txt', 'w+')
+        f.write(str(results))
+        f.close()
         lprs = [r for r in results if r['label'] == 'license_plate']
         plates = []
         if len(lprs) > 0:
             print(results)
             for lpr in lprs:
                 plates.append(process_image(image, lpr))
+            print(plates)
         else:
             print("no license_plates found")
             # TODO, remove following line after testing
@@ -66,22 +74,38 @@ class S(BaseHTTPRequestHandler):
 #     }
 # }
 
-DEBUG=False
 
-def process_image(image, lpr=None):
-    if lpr:
-        cropped_frame = image[ int(lpr['ymin']) : int(lpr['ymax']), int(lpr['xmin']): int(lpr['xmax'])]
-    else:
-        cropped_frame = image
-    # detect edges in frame
-    grayImage = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
-    dst = cv2.Canny(grayImage, 0, 150)
-    ret, threshcanny = cv2.threshold(dst, 127, 255, 0)
-    ret, thresh = cv2.threshold(grayImage, 127, 255, 0)
-    ret, threshbin = cv2.threshold(grayImage,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
-    # get contours
-    contours, hierarchy = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    c = max(contours, key = cv2.contourArea)
+DEBUG=False
+WINDOW_NAME='win'
+
+def showImage(img):
+    WINDOW_NAME='win'
+    cv2.imshow(WINDOW_NAME, img)
+    cv2.waitKey(1)
+
+ocr_results = []
+
+def detect_tilt(dst):
+    # get largest contour, use top two points as reference for rotation
+    # pass canny
+    edge_contours, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    recs = []
+    areas = {}
+    # filter to
+    max_area = 0
+    for con in edge_contours:
+        x,y,w,h = cv2.boundingRect(con)
+        # if ( ( (5  * h) > w) and (w > (1.5 * h))) :
+        if (w > (1.7 * h)) :
+            # print(f'{2.5  * h} > {w} > {h}  ' )
+            area = w * h
+            if area > max_area:
+                max_area = area
+                c = con
+            # recs.append(con)
+            # idx = int(h * w)
+            # areas[idx] = con
+    # c = max(recs, key = cv2.contourArea)
     x, y, w, h = cv2.boundingRect(c)
     # calculate angle to rotate image
     rect = cv2.minAreaRect(c) # rect[2] contains angle
@@ -94,73 +118,186 @@ def process_image(image, lpr=None):
     if y_sorted[2:][0][0] > y_sorted[2:][1][0]:
         angle = - angle
     # rotate image
+    return (angle, c)
     # print(f"rotating by {angle} degrees")
-    rotated_image = ndimage.rotate(cropped_frame, angle)
-    rotated_thresh = ndimage.rotate(thresh, angle)
-    contours, hierarchy = cv2.findContours(rotated_thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    c = max(contours, key = cv2.contourArea)
-    x, y, w, h = cv2.boundingRect(c)
-    cropped_rotated_thresh = rotated_thresh[y:y+h, x:x+w]
-    cropped_rotated_image = rotated_image[y:y+h, x:x+w]
-    # cv2.drawContours(rotated_image, [c], -1, (0,255,0), 1)
+
+
+def trim_border(image):
     '''
     thin out border
     white out lines that are > 90% black (in case of plate that touches border).
     high mean implies row/column is mostly white.
     '''
-    columns_mean = np.mean(cropped_rotated_thresh, axis = 0)
-    rows_mean = np.mean(cropped_rotated_thresh, axis = 1)
+    np.seterr(divide='ignore', invalid='ignore')
+    columns_mean = np.mean(image, axis = 0)
+    rows_mean = np.mean(image, axis = 1)
     # whiteout rows and columns that are mostly black, assuming those are borders
-    row_border_threshold = 50
-    border_rows = np.where(rows_mean < row_border_threshold )
-    cropped_rotated_thresh[[border_rows], :] = 255
-    # whiteout rows and columns that are mostly black, assuming those are borders
+    row_border_threshold = 10
     column_border_threshold = 25
+    border_rows = np.where(rows_mean < row_border_threshold )
     border_columns = np.where(columns_mean < column_border_threshold )
-    cropped_rotated_thresh[:, [border_columns]] = 255
-    contours, hierarchy = cv2.findContours(cropped_rotated_thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    inverted_thresh = cv2.bitwise_not(cropped_rotated_thresh)
-    dst = cv2.Canny(inverted_thresh, 50, 150)
-    edge_contours, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    areas = list(map(cv2.contourArea , edge_contours))
-    boxes = list(map(cv2.boundingRect, edge_contours))
-    # get index of contours that are taller than they are wide
-    letters = list(filter(lambda box: ((box[2] * box[3]) > 100) and (box[2] * 3 > box[3] > box[2]), boxes))
-    letters_y = [l[1] for l in letters]
-    letters_h = [l[3] for l in letters]
-    # y_median = statistics.median(letters_y)
-    h_median = int(statistics.median(letters_h)) #+ 3)
-    range_threshold = (h_median / 4) #5
-    # print(range_threshold)
-    # y_median_range = range(int(y_median - range_threshold), int(y_median + range_threshold))
-    h_median_range = range(int(h_median - range_threshold), int(h_median + range_threshold))
-    # x, y, w, h
-    # print(h_median_range)
-    letters_reduced = list(filter(lambda box: box[3] in h_median_range, letters))
-    # print(letters_reduced)
-    # con_idx = list(map( boxes.index, letters))
-    stencil = np.ones(cropped_rotated_thresh.shape, dtype=np.uint8)*255
-    # cropped_rotated_image_rgb = cv2.cvtColor(cropped_rotated_image, cv2.COLOR_BGR2RGB)
-    for l in letters_reduced:
-        x, y, w, h = l
-        stencil[y:y+h, x:x+w] = cropped_rotated_thresh[y:y+h, x:x+w]
-    # process ocr
-    tess_config = "-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    text = pytesseract.image_to_string(stencil, config=tess_config, lang="License+eng")
-    if len(text) > 0:
-        result = {"result": text}
+    # whiteout rows and columns that are mostly black, assuming those are borders
+    image[[border_rows], :] = 255
+    image[:, [border_columns]] = 255
+    return image
+
+def draw_contour_color(image, contours):
+    # rotated_image_copy = rotated_image.copy()
+    # cropped_rotated_image_copy = cropped_rotated_image.copy()
+    temp = image.copy()
+    for con in contours:
+        # color = (np.random.choice(range(256), size=3))
+        color = (np.random.randint(0,255), np.random.randint(0,255), np.random.randint(0,255))
+        rect = cv2.minAreaRect(con)
+        box = cv2.boxPoints(rect)
+        box = np.int0(box)
+        cv2.drawContours(temp, [box], -1, color, 2)
+    showImage(temp)
+    return temp
+
+def select_letter_contours(contours, horizon):
+    middle_contours = []
+    # going to
+    threshold = 5
+    for con in contours:
+        intersections = len(set(range(horizon - threshold, horizon + threshold)).intersection(con.take(1,2).flatten()))
+        if intersections > 0:
+            middle_contours.append(con)
+    # TODO, also remove contours under avg w/h using standard deviation and mean
+    return middle_contours
+
+def process_image(image, lpr=None):
+    if lpr:
+        cropped_frame = image.copy()[ int(lpr['ymin']) : int(lpr['ymax']), int(lpr['xmin']): int(lpr['xmax'])]
     else:
-        result = {"result": "no text recognized"}
-    print(result)
-    # numpy_vertical = np.vstack((cropped_rotated_thresh, cropped_rotated_image))
-    if DEBUG:
+        cropped_frame = image.copy()
+    # detect edges in frame
+    # dst = cv2.Canny(opened, 50, 150)
+
+    # first, upsize image
+    cropped_frame = cv2.resize(image.copy(), (image.shape[1] * 5, image.shape[0] * 5 ) )
+
+    # convert image to grayscale and binary threshold
+    grayImage = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
+    dst_rbg = cv2.Canny(cropped_frame, 50, 200)
+    # dst = cv2.Canny(grayImage, 50, 200) # , apertureSize=5, L2gradient=True)
+    ret, thresh = cv2.threshold(grayImage, 127, 255, 0)
+    ret, threshbin = cv2.threshold(grayImage,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+
+    # get edges of threshold
+    dst = cv2.Canny(thresh, 50, 200)
+
+    # testing
+    # upped_gray = cv2.resize(grayImage, (grayImage.shape[1] * 5, grayImage.shape[0] * 5 ) )
+    # ret, upped_thresh = cv2.threshold(upped_gray, 127, 255, 0)
+    # dst_upped = cv2.Canny(upped_thresh, 25, 150)
+    # testing
+
+    ret, threshcanny = cv2.threshold(dst, 127, 255, 0)
+    # k_size = 1
+    # kernel = np.ones((k_size,k_size),np.uint8)
+    # closed_dst = cv2.morphologyEx(dst, cv2.MORPH_CLOSE, kernel)
+    # ret, threshcanny = cv2.threshold(closed_dst, 127, 255, 0)
+
+    # find edges of threshold image
+    # ret, threshcanny = cv2.threshold(dst, 127, 255, 0)
+
+    # get angle of image
+    angle, c = detect_tilt(threshcanny)
+
+    # draw largest contour on image, assuming contour is plate (TODO, limit to closed contour)
+    rotated_original_image = ndimage.rotate(cropped_frame.copy(), angle, cval=255)
+    cv2.drawContours(cropped_frame, [c], -1, (0,255,0), 1)
+
+    # rotate image
+    rotated_image = ndimage.rotate(cropped_frame, angle, cval=255)
+    rotated_thresh = ndimage.rotate(thresh.copy(), angle, cval=255)
+
+    # get updated indices of contour location in rotated image
+    indices = np.where(np.all(rotated_image == (0,255,0), axis=-1))
+    max_y = max(indices[0])
+    min_y = min(indices[0])
+    max_x = max(indices[1])
+    min_x = min(indices[1])
+    w = max_x - min_x
+    h = max_y - min_y
+    x = min_x
+    y = min_y
+
+    # crop image (TODO, occassionally largest contour only contains partial plate)
+    h_padding = 3
+    w_padding = 2
+    cropped_rotated_thresh = rotated_thresh.copy()[y:y+h, x:x+w]
+    cropped_rotated_image = rotated_original_image.copy()[y:y+h, x:x+w]
+    grayImage = cv2.cvtColor(cropped_rotated_image, cv2.COLOR_BGR2GRAY)
+    ret, thresh = cv2.threshold(grayImage, 127, 255, 0)
+
+    # upsize cropped image. should mainly upsize if we want to use morphology to seperate blobs (dilate/erode)
+    # also want to upsize in hopes that edges will be closed
+
+    reduced_thresh = trim_border(thresh)
+    dst = cv2.Canny(cv2.bitwise_not(reduced_thresh), 50, 150)
+
+    '''
+    remove remaining border sections
+    '''
+    # get horizontal lines in the bottom quarter, primarily for letters that are connected by a border
+    # kernel = np.ones((1, 3), np.uint8)
+    # lines = cv2.morphologyEx( bottom[:,], cv2.MORPH_OPEN, kernel, iterations=5)
+    # contours, hierarchy = cv2.findContours(lines, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # cv2.drawContours(reduced_thresh[height - int(height/5):-1, :], contours, -1, (255,255,255), thickness=10)
+    # filter to bottom quarter
+    height = dst.shape[0]
+    bottom = dst[height - int(height/5):-1, :]
+
+    # open bottom edges horizontally (if they exist)
+    if np.sum(bottom) > 0:
+        kernel = np.ones((3,1),np.uint8)
+        opened = cv2.morphologyEx(bottom, cv2.MORPH_OPEN, kernel)
+        opened_dst = cv2.Canny(opened, 50, 150)
+        dst[height - int(height/5):-1, :] = opened_dst
+
+    # dst = cv2.Canny(reduced_thresh, 50, 150)
+    contours_upped, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+
+    '''
+    determine which contours contain letters based off approximate area
+    and filter down to contours that intersect the center horizontal point
+    '''
+    horizon = int( reduced_thresh.shape[0] / 2)
+    reduced_contours = select_letter_contours(contours_upped, horizon)
+    # stencil = np.ones((upped_thresh.shape), dtype=np.uint8)*255
+    stencil = np.ones( ( int(reduced_thresh.shape[0] * 1.25), int(reduced_thresh.shape[1] * 1.25))  , dtype=np.uint8)*255
+
+    for con in reduced_contours:
+        box = cv2.boundingRect(con)
+        x, y, w, h = box
+        stencil[y:y+h, x:x+w] = reduced_thresh[y:y+h, x:x+w]
+
+    if os.environ.get('DEBUG'):
         bin_to_image = lambda img: cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        row1 = np.hstack(( cropped_rotated_image, bin_to_image(cropped_rotated_thresh) ))
-        row2 = np.hstack(( bin_to_image(dst), bin_to_image(stencil)  )) # cropped_rotated_image
-        stages = np.vstack((row1, row2))
+        row1 = np.hstack(( thresh, dst ))
+        row2 = np.hstack(( reduced_thresh, dst ))
+
+        row_seperator = np.ones( (1, thresh.shape[1] * 2) , dtype=np.uint8)*127
+        # row2 = np.hstack(( bin_to_image(dst), bin_to_image(stencil) )) # cropped_rotated_image
+
+        # row3 = np.hstack( bin_to_image(stencil), np.ones((cropped_rotated_image.shape[0], stencil.shape[1] - cropped_rotated_image.shape[1])))
+        stages = np.vstack((row1, row_seperator))
+        stages = np.vstack((stages, row2))
+        # stages = row1
+        final = bin_to_image(stencil)
+        # stages = bin_to_image(row1)
         timestamp = datetime.now().strftime("%m%d_%H%M%S")
-        cv2.imwrite(timestamp + '.png', stages)
-    return result
+        cv2.imwrite(timestamp + '_stages.png', stages)
+        cv2.imwrite(timestamp + '_final.png', final)
+        # cv2.imwrite(timestamp + '_lines.png', lines)
+
+    # whitelists only work with legacy, --oem 0
+    tess_config = "-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 --psm 6"
+    text = pytesseract.image_to_string(stencil, config=tess_config, lang="eng")
+    print(text)
+    return text
 
 def showImage(img, name='win'):
     cv2.imshow(name, img)
@@ -172,10 +309,17 @@ def run(server_class=HTTPServer, handler_class=S, addr="0.0.0.0", port=8000):
     print("starting server on port " + str(port))
     httpd.serve_forever()
 
-if len(sys.argv) > 1:
-    filename = sys.argv[1]
-    print(filename[0])
-    image = cv2.imread(filename)
+
+if len(sys.argv) == 2:
+    image_filename = sys.argv[1]
+    image = cv2.imread(image_filename)
     process_image(image)
+elif (len(sys.argv) == 3):
+    image_filename = sys.argv[1]
+    results_path = sys.argv[2]
+    results = eval(open(results_path).read())
+    lprs = [r for r in results if r['label'] == 'license_plate']
+    image = cv2.imread(image_filename)
+    process_image(image, lprs[0])
 else:
     run()
