@@ -10,7 +10,7 @@ When the reader has completed this Code Pattern, they will understand how to
 - Leverage Python Opencv libraries to prepare an image for OCR
 - Adjust Tesseract OCR to detect specific fonts
 
-<img src="https://i.imgur.com/Xy1drK4.png">
+<img src="https://developer.ibm.com/developer/patterns/custom-inference-script-for-reading-license-plates-of-cars/images/license-plate-ocr-flow.png">
 <!-- ![Architecture](https://i.imgur.com/lKeuzAn.png) -->
 
 
