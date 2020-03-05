@@ -9,7 +9,7 @@ spec:
     srv: api
   type: NodePort
   ports:
-   - name: python_server
+   - name: python-server
      port: 8000
      nodePort: 30001
 ---
