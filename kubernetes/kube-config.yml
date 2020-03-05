@@ -9,7 +9,7 @@ spec:
     srv: api
   type: NodePort
   ports:
-   - name: react
+   - name: python_server
      port: 8000
      nodePort: 30001
 ---
@@ -22,11 +22,9 @@ metadata:
 spec:
   containers:
     - name: ubuntu-ocr
-      #image: kkbankol/ubuntu-ocr
-      image: kkbankol/ubuntu-ocr:tess4
+      image: kkbankol/ubuntu-ocr
       imagePullPolicy: Always
       stdin: true
       tty: true
-      #command: ["/bin/bash"]
       command: ["/usr/bin/python3"]
       args: ["ocr_server.py"]
