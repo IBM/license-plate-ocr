@@ -1,6 +1,6 @@
 # Detect License Plate
 
-In this Code Pattern, we will demonstrate how to leverage OCR and the "IBM Visual" object recognition service to identify and read license plates.
+In this Code Pattern, we will demonstrate how to leverage OCR and the "IBM Visual Insights" object recognition service to identify and read license plates.
 
 This use case is ideal for automated "Gate Access Control" in spaces such as a workplace, apartment complex, or mall parking lot.
 
