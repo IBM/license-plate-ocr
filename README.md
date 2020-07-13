@@ -1,6 +1,6 @@
 # Detect License Plate
 
-In this Code Pattern, we will demonstrate how to leverage OCR and the "IBM Visual Insights" object recognition service to identify and read license plates.
+In this Code Pattern, we will demonstrate how to leverage OCR and the "IBM Maximo Visual Inspection" object recognition service to identify and read license plates.
 
 This use case is ideal for automated "Gate Access Control" in spaces such as a workplace, apartment complex, or mall parking lot.
 
@@ -16,18 +16,18 @@ When the reader has completed this Code Pattern, they will understand how to
 
 #  Components
 
-* [IBM Visual Insights](https://www.ibm.com/products/maximo). This is an image analysis platform that allows you to build and manage computer vision models, upload and annotate images, and deploy apis to analyze images and videos.
+* [IBM Maximo Visual Inspection](https://www.ibm.com/products/maximo). This is an image analysis platform that allows you to build and manage computer vision models, upload and annotate images, and deploy apis to analyze images and videos.
 
-Sign up for a trial account of IBM Visual Insights [here](https://developer.ibm.com/linuxonpower/deep-learning-powerai/try-powerai/). This link includes options to provision a IBM Visual Insights instance either locally on in the cloud.
+Sign up for a trial account of IBM Maximo Visual Inspection [here](https://developer.ibm.com/linuxonpower/deep-learning-powerai/try-powerai/). This link includes options to provision a IBM Maximo Visual Inspection instance either locally on in the cloud.
 
 
 * [Kubernetes](https://cloud.ibm.com/kubernetes/catalog/cluster). Kubernetes is a container orchestration engine. In this case, we'll use Kubernetes to host a python server with OCR libraries. The server will accept images via an HTTP POST request, and process the images to extract and recognize text from an image.
 
 # Flow
 
-1. Photo of car is uploaded to IBM Visual Insights dashboard.
+1. Photo of car is uploaded to IBM Maximo Visual Inspection dashboard.
 2. Object recognition model identifies location of license plate(s).
-3. IBM Visual Insights "Post Processing" script forwards image and object location to custom server.
+3. IBM Maximo Visual Inspection "Post Processing" script forwards image and object location to custom server.
 4. Custom server improves image with following steps:
     - Binarisation (Convert image to black and white)
     - [Edge Detection](https://docs.opencv.org/2.4/doc/tutorials/imgproc/imgtrans/canny_detector/canny_detector.html)
@@ -37,7 +37,7 @@ Sign up for a trial account of IBM Visual Insights [here](https://developer.ibm.
 
 # Prerequisites
 
-* An account on IBM Marketplace that has access to IBM Visual Insights. This service can be provisioned [here](https://developer.ibm.com/linuxonpower/deep-learning-powerai/vision/access-registration-form/)
+* An account on IBM Marketplace that has access to IBM Maximo Visual Inspection. This service can be provisioned [here](https://developer.ibm.com/linuxonpower/deep-learning-powerai/vision/access-registration-form/)
 
 <!-- * [Docker Engine](https://docs.docker.com/install/).  -->
 
@@ -46,8 +46,8 @@ Sign up for a trial account of IBM Visual Insights [here](https://developer.ibm.
 Follow these steps to setup and run this Code Pattern.
 
 1. [Deploy a Kubernetes Cluster](#1-deploy-a-kubernetes-cluster)
-2. [Upload training images to IBM Visual Insights ](#2-upload-training-images-to-powerai-vision)
-3. [Train and deploy model in IBM Visual Insights](#3-Train-and-deploy-model-in-PowerAI-Vision)
+2. [Upload training images to IBM Maximo Visual Inspection ](#2-upload-training-images-to-powerai-vision)
+3. [Train and deploy model in IBM Maximo Visual Inspection](#3-Train-and-deploy-model-in-PowerAI-Vision)
 4. [Clone repository](#4-clone-repository)
 5. [Deploy OCR Server](#5-deploy-ocr-server)
 
@@ -72,9 +72,9 @@ Set the external IP address as the URL variable in the [custom.py](custom.py#L52
 <img src="https://i.imgur.com/p0gTEfD.png" />
 
 
-## 2. Upload training images to IBM Visual Insights
+## 2. Upload training images to IBM Maximo Visual Inspection
 
-Login to IBM Visual Insights Dashboard
+Login to IBM Maximo Visual Inspection Dashboard
 
 <img src="https://i.imgur.com/66awAad.png">
 
@@ -89,7 +89,7 @@ Drag and drop images to build your dataset.
 <img src="https://i.imgur.com/rD0sWQN.png">
 
 
-## 3. Train and deploy model in IBM Visual Insights
+## 3. Train and deploy model in IBM Maximo Visual Inspection
 
 In this example, we'll build an object recognition model to identify specific objects in each frame of a video. After the images have completed uploading to the dataset, select one or more images in the dataset, and then select "Label Objects".
 
@@ -137,7 +137,7 @@ While the model is training, we'll package our custom inference script as a zip 
 zip ocr_process.zip custom.py
 ```
 
-Then, click "Custom Assets" in the IBM Visual Insights dashboard's upper menu.
+Then, click "Custom Assets" in the IBM Maximo Visual Inspection dashboard's upper menu.
 
 Drag and drop the zip file to the section labeled "Release to import asset"
 
