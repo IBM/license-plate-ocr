@@ -62,6 +62,10 @@ class S(BaseHTTPRequestHandler):
             # TODO, remove following line after testing
             process_image(image)
 
+
+# sample_res = [{'confidence': 0.9999319314956665, 'ymax': 638, 'label': 'license_plate', 'xmax': 635, 'xmin': 373, 'ymin': 588, 'polygons': [[[406, 586], [387, 590], [378, 588], [368, 590], [368, 607], [387, 610], [378, 612], [387, 614], [378, 616], [387, 618], [368, 621], [368, 636], [387, 640], [602, 640], [621, 636], [621, 623], [630, 621], [621, 619], [630, 618], [621, 616], [621, 596], [630, 594], [602, 588], [593, 590], [584, 588], [574, 590], [565, 588], [556, 590], [509, 590], [499, 592], [490, 592], [481, 590], [462, 590], [443, 586]]]}, {'confidence': 0.9998823404312134, 'ymax': 795, 'label': 'car', 'xmax': 943, 'xmin': 61, 'ymin': 276, 'polygons': [[[170, 267], [107, 304], [107, 471], [44, 508], [44, 526], [107, 563], [107, 693], [44, 730], [170, 804], [864, 804], [927, 767], [896, 749], [927, 730], [896, 712], [959, 675], [959, 600], [896, 563], [896, 378], [864, 359], [864, 304], [801, 267]]]}]
+
+
 # TODO, add method to take average of
 # def update_best
 # plates_observed = {
@@ -91,21 +95,14 @@ def detect_tilt(dst):
     edge_contours, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     recs = []
     areas = {}
-    # filter to
     max_area = 0
     for con in edge_contours:
         x,y,w,h = cv2.boundingRect(con)
-        # if ( ( (5  * h) > w) and (w > (1.5 * h))) :
         if (w > (1.7 * h)) :
-            # print(f'{2.5  * h} > {w} > {h}  ' )
             area = w * h
             if area > max_area:
                 max_area = area
                 c = con
-            # recs.append(con)
-            # idx = int(h * w)
-            # areas[idx] = con
-    # c = max(recs, key = cv2.contourArea)
     x, y, w, h = cv2.boundingRect(c)
     # calculate angle to rotate image
     rect = cv2.minAreaRect(c) # rect[2] contains angle
@@ -171,19 +168,11 @@ def process_image(image, lpr=None):
         cropped_frame = image.copy()[ int(lpr['ymin']) : int(lpr['ymax']), int(lpr['xmin']): int(lpr['xmax'])]
     else:
         cropped_frame = image.copy()
-    # detect edges in frame
-    # dst = cv2.Canny(opened, 50, 150)
-
-    # first, upsize image
-    cropped_frame = cv2.resize(image.copy(), (image.shape[1] * 5, image.shape[0] * 5 ) )
-
-    # convert image to grayscale and binary threshold
+    cropped_frame = cv2.resize(cropped_frame.copy(), (cropped_frame.shape[1] * 5, cropped_frame.shape[0] * 5 ) )
     grayImage = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
     dst_rbg = cv2.Canny(cropped_frame, 50, 200)
-    # dst = cv2.Canny(grayImage, 50, 200) # , apertureSize=5, L2gradient=True)
     ret, thresh = cv2.threshold(grayImage, 127, 255, 0)
     ret, threshbin = cv2.threshold(grayImage,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
-
     # get edges of threshold
     dst = cv2.Canny(thresh, 50, 200)
 
