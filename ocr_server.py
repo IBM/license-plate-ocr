@@ -34,7 +34,6 @@ class S(BaseHTTPRequestHandler):
         if 'content-length' in self.headers:
             # length = int(self.headers.get('content-length'))
             length = int(self.headers['Content-Length'])
-            print("length: " + str(length))
             field_data = self.rfile.read(length).decode("utf-8")
             self.send_response(200, "OK")
             self.end_headers()
@@ -96,13 +95,17 @@ def detect_tilt(dst):
     recs = []
     areas = {}
     max_area = 0
+    c = None
     for con in edge_contours:
         x,y,w,h = cv2.boundingRect(con)
-        if (w > (1.7 * h)) :
+        # if ( ((3 * h) > w) and (w > (1.7 * h))):
+        if (w > (1.5 * h)):
             area = w * h
             if area > max_area:
+                print("updating max area")
                 max_area = area
                 c = con
+    # c = max(edge_contours)
     x, y, w, h = cv2.boundingRect(c)
     # calculate angle to rotate image
     rect = cv2.minAreaRect(c) # rect[2] contains angle
@@ -163,12 +166,14 @@ def select_letter_contours(contours, horizon):
     # TODO, also remove contours under avg w/h using standard deviation and mean
     return middle_contours
 
+
 def process_image(image, lpr=None):
     if lpr:
         cropped_frame = image.copy()[ int(lpr['ymin']) : int(lpr['ymax']), int(lpr['xmin']): int(lpr['xmax'])]
     else:
         cropped_frame = image.copy()
-    cropped_frame = cv2.resize(cropped_frame.copy(), (cropped_frame.shape[1] * 5, cropped_frame.shape[0] * 5 ) )
+    # resize cropped image
+    # cropped_frame = cv2.resize(cropped_frame.copy(), (cropped_frame.shape[1] * 5, cropped_frame.shape[0] * 5 ) )
     grayImage = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
     dst_rbg = cv2.Canny(cropped_frame, 50, 200)
     ret, thresh = cv2.threshold(grayImage, 127, 255, 0)
@@ -194,37 +199,38 @@ def process_image(image, lpr=None):
     # get angle of image
     angle, c = detect_tilt(threshcanny)
 
-    # draw largest contour on image, assuming contour is plate (TODO, limit to closed contour)
-    rotated_original_image = ndimage.rotate(cropped_frame.copy(), angle, cval=255)
-    cv2.drawContours(cropped_frame, [c], -1, (0,255,0), 1)
-
     # rotate image
+    # if abs(angle) < 45:
+    rotated_original_image = ndimage.rotate(cropped_frame.copy(), angle, cval=255)
     rotated_image = ndimage.rotate(cropped_frame, angle, cval=255)
     rotated_thresh = ndimage.rotate(thresh.copy(), angle, cval=255)
 
+    # draw largest contour on image, assuming contour is plate (TODO, limit to closed contour)
+    cv2.drawContours(cropped_frame, [c], -1, (0,255,0), 1)
+
     # get updated indices of contour location in rotated image
     indices = np.where(np.all(rotated_image == (0,255,0), axis=-1))
-    max_y = max(indices[0])
-    min_y = min(indices[0])
-    max_x = max(indices[1])
-    min_x = min(indices[1])
-    w = max_x - min_x
-    h = max_y - min_y
-    x = min_x
-    y = min_y
-
-    # crop image (TODO, occassionally largest contour only contains partial plate)
-    h_padding = 3
-    w_padding = 2
-    cropped_rotated_thresh = rotated_thresh.copy()[y:y+h, x:x+w]
-    cropped_rotated_image = rotated_original_image.copy()[y:y+h, x:x+w]
-    grayImage = cv2.cvtColor(cropped_rotated_image, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(grayImage, 127, 255, 0)
+    if (len(indices[0]) > 0):
+        max_y = max(indices[0])
+        min_y = min(indices[0])
+        max_x = max(indices[1])
+        min_x = min(indices[1])
+        w = max_x - min_x
+        h = max_y - min_y
+        x = min_x
+        y = min_y
+        # crop image (TODO, occassionally largest contour only contains partial plate)
+        h_padding = 3
+        w_padding = 2
+        cropped_rotated_thresh = rotated_thresh.copy()[y:y+h, x:x+w]
+        cropped_rotated_image = rotated_original_image.copy()[y:y+h, x:x+w]
+        grayImage = cv2.cvtColor(cropped_rotated_image, cv2.COLOR_BGR2GRAY)
+        ret, rotated_thresh = cv2.threshold(grayImage, 127, 255, 0)
 
     # upsize cropped image. should mainly upsize if we want to use morphology to seperate blobs (dilate/erode)
     # also want to upsize in hopes that edges will be closed
 
-    reduced_thresh = trim_border(thresh)
+    reduced_thresh = trim_border(rotated_thresh)
     dst = cv2.Canny(cv2.bitwise_not(reduced_thresh), 50, 150)
 
     '''
@@ -265,6 +271,8 @@ def process_image(image, lpr=None):
 
     if os.environ.get('DEBUG'):
         bin_to_image = lambda img: cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        print(thresh.shape)
+        print(dst.shape)
         row1 = np.hstack(( thresh, dst ))
         row2 = np.hstack(( reduced_thresh, dst ))
 
