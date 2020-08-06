@@ -8,12 +8,14 @@ import argparse
 import json
 import http
 import numpy as np
-from  scipy import ndimage
+from scipy import ndimage
 import statistics
 import sys
 from datetime import datetime
 import statistics
 from pytesseract import Output
+
+
 # import process_image
 
 class S(BaseHTTPRequestHandler):
@@ -78,15 +80,18 @@ class S(BaseHTTPRequestHandler):
 # }
 
 
-DEBUG=False
-WINDOW_NAME='win'
+DEBUG = False
+WINDOW_NAME = 'win'
+
 
 def showImage(img):
-    WINDOW_NAME='win'
+    WINDOW_NAME = 'win'
     cv2.imshow(WINDOW_NAME, img)
     cv2.waitKey(1)
 
+
 ocr_results = []
+
 
 def detect_tilt(dst):
     # get largest contour, use top two points as reference for rotation
@@ -97,7 +102,7 @@ def detect_tilt(dst):
     max_area = 0
     c = None
     for con in edge_contours:
-        x,y,w,h = cv2.boundingRect(con)
+        x, y, w, h = cv2.boundingRect(con)
         # if ( ((3 * h) > w) and (w > (1.7 * h))):
         if (w > (1.5 * h)):
             area = w * h
@@ -108,7 +113,7 @@ def detect_tilt(dst):
     # c = max(edge_contours)
     x, y, w, h = cv2.boundingRect(c)
     # calculate angle to rotate image
-    rect = cv2.minAreaRect(c) # rect[2] contains angle
+    rect = cv2.minAreaRect(c)  # rect[2] contains angle
     box = cv2.boxPoints(rect)
     # sort by y values
     y_sorted = box[np.argsort(box[:, 1]), :]
@@ -129,17 +134,18 @@ def trim_border(image):
     high mean implies row/column is mostly white.
     '''
     np.seterr(divide='ignore', invalid='ignore')
-    columns_mean = np.mean(image, axis = 0)
-    rows_mean = np.mean(image, axis = 1)
+    columns_mean = np.mean(image, axis=0)
+    rows_mean = np.mean(image, axis=1)
     # whiteout rows and columns that are mostly black, assuming those are borders
     row_border_threshold = 10
     column_border_threshold = 25
-    border_rows = np.where(rows_mean < row_border_threshold )
-    border_columns = np.where(columns_mean < column_border_threshold )
+    border_rows = np.where(rows_mean < row_border_threshold)
+    border_columns = np.where(columns_mean < column_border_threshold)
     # whiteout rows and columns that are mostly black, assuming those are borders
     image[[border_rows], :] = 255
     image[:, [border_columns]] = 255
     return image
+
 
 def draw_contour_color(image, contours):
     # rotated_image_copy = rotated_image.copy()
@@ -147,7 +153,7 @@ def draw_contour_color(image, contours):
     temp = image.copy()
     for con in contours:
         # color = (np.random.choice(range(256), size=3))
-        color = (np.random.randint(0,255), np.random.randint(0,255), np.random.randint(0,255))
+        color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
         rect = cv2.minAreaRect(con)
         box = cv2.boxPoints(rect)
         box = np.int0(box)
@@ -155,12 +161,13 @@ def draw_contour_color(image, contours):
     showImage(temp)
     return temp
 
+
 def select_letter_contours(contours, horizon):
     middle_contours = []
     # going to
     threshold = 5
     for con in contours:
-        intersections = len(set(range(horizon - threshold, horizon + threshold)).intersection(con.take(1,2).flatten()))
+        intersections = len(set(range(horizon - threshold, horizon + threshold)).intersection(con.take(1, 2).flatten()))
         if intersections > 0:
             middle_contours.append(con)
     # TODO, also remove contours under avg w/h using standard deviation and mean
@@ -169,7 +176,7 @@ def select_letter_contours(contours, horizon):
 
 def process_image(image, lpr=None):
     if lpr:
-        cropped_frame = image.copy()[ int(lpr['ymin']) : int(lpr['ymax']), int(lpr['xmin']): int(lpr['xmax'])]
+        cropped_frame = image.copy()[int(lpr['ymin']): int(lpr['ymax']), int(lpr['xmin']): int(lpr['xmax'])]
     else:
         cropped_frame = image.copy()
     # resize cropped image
@@ -177,7 +184,7 @@ def process_image(image, lpr=None):
     grayImage = cv2.cvtColor(cropped_frame, cv2.COLOR_BGR2GRAY)
     dst_rbg = cv2.Canny(cropped_frame, 50, 200)
     ret, thresh = cv2.threshold(grayImage, 127, 255, 0)
-    ret, threshbin = cv2.threshold(grayImage,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+    ret, threshbin = cv2.threshold(grayImage, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
     # get edges of threshold
     dst = cv2.Canny(thresh, 50, 200)
 
@@ -206,10 +213,10 @@ def process_image(image, lpr=None):
     rotated_thresh = ndimage.rotate(thresh.copy(), angle, cval=255)
 
     # draw largest contour on image, assuming contour is plate (TODO, limit to closed contour)
-    cv2.drawContours(cropped_frame, [c], -1, (0,255,0), 1)
+    cv2.drawContours(cropped_frame, [c], -1, (0, 255, 0), 1)
 
     # get updated indices of contour location in rotated image
-    indices = np.where(np.all(rotated_image == (0,255,0), axis=-1))
+    indices = np.where(np.all(rotated_image == (0, 255, 0), axis=-1))
     if (len(indices[0]) > 0):
         max_y = max(indices[0])
         min_y = min(indices[0])
@@ -222,8 +229,8 @@ def process_image(image, lpr=None):
         # crop image (TODO, occassionally largest contour only contains partial plate)
         h_padding = 3
         w_padding = 2
-        cropped_rotated_thresh = rotated_thresh.copy()[y:y+h, x:x+w]
-        cropped_rotated_image = rotated_original_image.copy()[y:y+h, x:x+w]
+        cropped_rotated_thresh = rotated_thresh.copy()[y:y + h, x:x + w]
+        cropped_rotated_image = rotated_original_image.copy()[y:y + h, x:x + w]
         grayImage = cv2.cvtColor(cropped_rotated_image, cv2.COLOR_BGR2GRAY)
         ret, rotated_thresh = cv2.threshold(grayImage, 127, 255, 0)
 
@@ -243,14 +250,14 @@ def process_image(image, lpr=None):
     # cv2.drawContours(reduced_thresh[height - int(height/5):-1, :], contours, -1, (255,255,255), thickness=10)
     # filter to bottom quarter
     height = dst.shape[0]
-    bottom = dst[height - int(height/5):-1, :]
+    bottom = dst[height - int(height / 5):-1, :]
 
     # open bottom edges horizontally (if they exist)
     if np.sum(bottom) > 0:
-        kernel = np.ones((3,1),np.uint8)
+        kernel = np.ones((3, 1), np.uint8)
         opened = cv2.morphologyEx(bottom, cv2.MORPH_OPEN, kernel)
         opened_dst = cv2.Canny(opened, 50, 150)
-        dst[height - int(height/5):-1, :] = opened_dst
+        dst[height - int(height / 5):-1, :] = opened_dst
 
     # dst = cv2.Canny(reduced_thresh, 50, 150)
     contours_upped, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -259,24 +266,24 @@ def process_image(image, lpr=None):
     determine which contours contain letters based off approximate area
     and filter down to contours that intersect the center horizontal point
     '''
-    horizon = int( reduced_thresh.shape[0] / 2)
+    horizon = int(reduced_thresh.shape[0] / 2)
     reduced_contours = select_letter_contours(contours_upped, horizon)
     # stencil = np.ones((upped_thresh.shape), dtype=np.uint8)*255
-    stencil = np.ones( ( int(reduced_thresh.shape[0] * 1.25), int(reduced_thresh.shape[1] * 1.25))  , dtype=np.uint8)*255
+    stencil = np.ones((int(reduced_thresh.shape[0] * 1.25), int(reduced_thresh.shape[1] * 1.25)), dtype=np.uint8) * 255
 
     for con in reduced_contours:
         box = cv2.boundingRect(con)
         x, y, w, h = box
-        stencil[y:y+h, x:x+w] = reduced_thresh[y:y+h, x:x+w]
+        stencil[y:y + h, x:x + w] = reduced_thresh[y:y + h, x:x + w]
 
     if os.environ.get('DEBUG'):
         bin_to_image = lambda img: cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
         print(thresh.shape)
         print(dst.shape)
-        row1 = np.hstack(( thresh, dst ))
-        row2 = np.hstack(( reduced_thresh, dst ))
+        row1 = np.hstack((thresh, dst))
+        row2 = np.hstack((reduced_thresh, dst))
 
-        row_seperator = np.ones( (1, thresh.shape[1] * 2) , dtype=np.uint8)*127
+        row_seperator = np.ones((1, thresh.shape[1] * 2), dtype=np.uint8) * 127
         # row2 = np.hstack(( bin_to_image(dst), bin_to_image(stencil) )) # cropped_rotated_image
 
         # row3 = np.hstack( bin_to_image(stencil), np.ones((cropped_rotated_image.shape[0], stencil.shape[1] - cropped_rotated_image.shape[1])))
@@ -296,9 +303,11 @@ def process_image(image, lpr=None):
     print(text)
     return text
 
+
 def showImage(img, name='win'):
     cv2.imshow(name, img)
     cv2.waitKey(1)
+
 
 def run(server_class=HTTPServer, handler_class=S, addr="0.0.0.0", port=8000):
     server_address = ('', port)

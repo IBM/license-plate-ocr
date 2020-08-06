@@ -6,6 +6,8 @@ import requests
 import json
 import shutil
 import sys
+
+
 class CustomInference:
     # Callout for inference pre-processing.  Will be called before the
     # actual inference on the "image"
@@ -14,7 +16,7 @@ class CustomInference:
     #    image:    Image represented as a NumPy array that inference is to be
     #              performed on.
     #
-    #params:  To be used for additional parameters.  This will be
+    # params:  To be used for additional parameters.  This will be
     #             a listof key/value pairs.
     #
     # Output:
@@ -24,6 +26,7 @@ class CustomInference:
     #
     def onPreProcessing(self, image, params):
         return image
+
     # Callout for the inference post-processing.  Will be called
     # after the image has been inferred.
     #
@@ -31,10 +34,10 @@ class CustomInference:
     #    Image:    Image represented as a NumPy array that inference is to be
     #              performed on.
     #
-    #results:  JSON of the inference results.  The JSON will be
+    # results:  JSON of the inference results.  The JSON will be
     #              dependent on thetype of inference.
     #
-    #params: To be used for additional parameters.  This will
+    # params: To be used for additional parameters.  This will
     #              be a list of key/value pairs
     #
     # Output:
@@ -45,30 +48,30 @@ class CustomInference:
     #              under the key "user".
     #
     def onPostProcessing(self, image, results, params):
-         print("onPostProcessing image.shape")
-         print(image.shape)
-         print("onPostProcessing results")
-         print(results)
-         # url = "http://127.0.0.1:8000"
-         try:
-             payload = {'results': results, 'image': image.tolist()}
-             print("posting payload")
-             r = requests.post(url, json=payload, timeout=120)
-             print("status")
-             print(r)
-         except Exception as inst:
-             print(inst)
-         return results
+        print("onPostProcessing image.shape")
+        print(image.shape)
+        print("onPostProcessing results")
+        print(results)
+        url = "http://169.55.177.105:30001"
+        try:
+            payload = {'results': results, 'image': image.tolist()}
+            print("posting payload")
+            r = requests.post(url, json=payload, timeout=120)
+            print("status")
+            print(r)
+        except Exception as inst:
+            print(inst)
+        return results
 
 # def zip_image(image):
-     # path = "./results"
-     # if not os.path.exists(path):
-     #     os.mkdir(path)
-     # cv2.imwrite('./results/output.png', image)
-     # shutil.make_archive('./results/inference_data', 'zip',  './results/')
-     # f = open("results/inference_data.zip", 'rb')
-     # files = {'inference_data.zip': f}
-     # payload = {'file':  {  "inference_data.zip"} }
-     # files={"archive": ("test.zip", fileobj)})
-     # print("onPostProcessing payload")
-     # r = requests.post(url, files=files)
+# path = "./results"
+# if not os.path.exists(path):
+#     os.mkdir(path)
+# cv2.imwrite('./results/output.png', image)
+# shutil.make_archive('./results/inference_data', 'zip',  './results/')
+# f = open("results/inference_data.zip", 'rb')
+# files = {'inference_data.zip': f}
+# payload = {'file':  {  "inference_data.zip"} }
+# files={"archive": ("test.zip", fileobj)})
+# print("onPostProcessing payload")
+# r = requests.post(url, files=files)
