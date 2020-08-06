@@ -51,7 +51,7 @@ class Db2Connection:
             "userid": self.credentials["username"],
             "password": self.credentials["password"]
         }
-        self.schema_name = "RHN67668"
+        self.schema_name = "NQL98658"
         self.table_name = "LICENSE_OCR"
 
     def authenticate(self):
