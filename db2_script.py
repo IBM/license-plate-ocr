@@ -25,6 +25,7 @@
 # Load The Appropriate Python Modules
 import json
 import requests
+from datetime import datetime
 
 
 class BColors:
@@ -39,6 +40,10 @@ class BColors:
 
 
 class Db2Connection:
+    """
+
+    """
+
     def __init__(self, credentials):
         """
 
@@ -50,9 +55,13 @@ class Db2Connection:
             "userid": self.credentials["username"],
             "password": self.credentials["password"]
         }
+
         self.schema_name = "NQL98658"
         self.logs_table = "LICENSE_OCR"
         self.employee_details_table = "EMPLOYEE_DETAILS"
+
+        self.date = datetime.today().strftime('%Y-%m-%d')
+        self.time = datetime.now().strftime('%H:%M:%S')
 
     def authenticate(self):
         """
@@ -67,13 +76,14 @@ class Db2Connection:
             }
 
         The access token is valid for about an hour which means you will have to refresh it if you've been away for a while.
+        =========================================================================================================
 
-        @returns results returned by the RESTful call
+        @return results returned by the RESTful call
         """
         print(BColors.HEADER + "\n\nConnecting to the \'" + self.host + "\' server ...\n", end="" + BColors.ENDC)
 
         service = "/auth/tokens"
-        print("API CALL: ", self.host + service)
+        print(BColors.OKBLUE + "API CALL: ", self.host + service + BColors.ENDC)
         r = requests.post(self.host + service, json=self.user_info)
 
         if r.status_code == 200:
@@ -87,6 +97,7 @@ class Db2Connection:
 
     def schema_info(self, auth_token):
         """
+        =========================================================================================================
         Returns the list of tables in a schema.
 
         CALL:
@@ -112,6 +123,9 @@ class Db2Connection:
             * resources - List of tables
                 * name - The table name
                 * schema - The schema name
+        =========================================================================================================
+        @param auth_token:
+        @return:
         """
         print(BColors.HEADER + "\nAttempting to Collect data from schema {} ...".format(self.schema_name)
               + BColors.ENDC)
@@ -122,12 +136,12 @@ class Db2Connection:
             'authorization': "Bearer " + auth_token
         }
         # GET request
-        print("API CALL: ", self.host + service)
+        print(BColors.OKBLUE + "API CALL: ", self.host + service + BColors.ENDC)
         r = requests.get(self.host + service, headers=headers)
 
         log_table = emp_table = False
         if r.status_code == 200:
-            print(BColors.OKGREEN + "Data Successfully Collected." + BColors.ENDC)
+            print(BColors.OKGREEN + "Data Successfully Collected!" + BColors.ENDC)
             num_tables = r.json()["count"]
             resources = r.json()["resources"]
 
@@ -145,8 +159,125 @@ class Db2Connection:
 
         return {"Logs": log_table, "Emp": emp_table}
 
-    def write_data(self, auth_token):
+    def create_table(self, auth_token, table_name):
         """
+        Create a new table.
+        CALL:
+            PUT /admin/tables
+        =========================================================================================================
+
+        @param auth_token:
+        @param table_name:
+        @return:
+        """
+        print(BColors.HEADER + "\nAttempting to create table: {} under schema: {} ...".format(table_name,
+                                                                                              self.schema_name)
+              + BColors.ENDC)
+
+        service = "/admin/tables"
+
+        payload = {"LICENSE_OCR": {"schema": self.schema_name, "table": self.logs_table,
+                                   "column_info": [
+                                       {"data_type": "CHAR", "length": 10, "scale": {}, "column_name": "License_Plate",
+                                        "nullable": "true"},
+                                       {"data_type": "TIME", "length": {}, "scale": {}, "column_name": "Entry_Time",
+                                        "nullable": "true"},
+                                       {"data_type": "TIME", "length": {}, "scale": {}, "column_name": "Exit_Time",
+                                        "nullable": "true"},
+                                       {"data_type": "DATE", "length": {}, "scale": {}, "column_name": "Current_Date",
+                                        "nullable": "true"}]
+                                   },
+                   "EMPLOYEE_DETAILS": {"schema": self.schema_name, "table": self.employee_details_table,
+                                        "column_info": [
+                                            {"data_type": "CHAR", "length": 20, "scale": {},
+                                             "column_name": "Employee_Name",
+                                             "nullable": "true"},
+                                            {"data_type": "CHAR", "length": 10, "scale": {},
+                                             "column_name": "License_Plate",
+                                             "nullable": "true"},
+                                            {"data_type": "CHAR", "length": 15, "scale": {},
+                                             "column_name": "Position",
+                                             "nullable": "true"}]
+                                        }
+                   }
+        headers = {
+            'content-type': "application/json",
+            'authorization': "Bearer " + auth_token
+        }
+
+        print("API CALL: ", self.host + service)
+        r = requests.put(self.host + service, data=json.dumps(payload[table_name]), headers=headers)
+        if r.status_code == 201:
+            print(BColors.OKGREEN + "Successfully created table {}!".format(table_name) + BColors.ENDC)
+        else:
+            print(BColors.FAIL + "Error Creating Table."
+                                 "\nStatus Code: {}"
+                                 "\nERROR Message: {}"
+                                 "\n\nExiting Application.".format(r.status_code, r.reason) + BColors.ENDC)
+            exit(-1)
+
+    def insert_sql(self, service, license_plate, headers):
+        """
+
+        =========================================================================================================
+        @param service:
+        @param license_plate:
+        @param headers:
+        @return:
+        """
+        print(BColors.HEADER + "\nPerforming an Insert Query for License Plate {}".format(license_plate)
+              + BColors.ENDC)
+
+        insert_command = {
+            "commands": "INSERT INTO LICENSE_OCR"
+                        "(\"LICENSE_PLATE\",\"ENTRY_TIME\",\"EXIT_TIME\",\"CURRENT_DATE\") "
+                        "VALUES('{}','{}', NULL, '{}');".format(license_plate, self.time, self.date),
+            "limit": {},
+            "separator": ";",
+            "stop_on_error": "yes"
+        }
+        print("Insert Statement: {}".format(insert_command["commands"]))
+        print(BColors.OKBLUE + "API CALL: ", self.host + service + BColors.ENDC)
+
+        insert_req = requests.post(self.host + service, headers=headers, json=insert_command)
+        if insert_req.status_code == 201:
+            print(BColors.OKGREEN + "SQL Insert Successful!" + BColors.ENDC)
+        else:
+            print(BColors.FAIL + "Error Inserting Data"
+                                 "\nStatus Code: {}"
+                                 "\nERROR Message: {}".format(insert_req.status_code, insert_req.reason) + BColors.ENDC)
+
+    def retrieve_sql(self, service, job_id, headers):
+        """
+
+        =========================================================================================================
+        @param service:
+        @param job_id:
+        @param headers:
+        @return:
+        """
+        # Retrieving the SQL Results
+        print(BColors.HEADER + "\nAttempting to Retrieve SQL Data ..." + BColors.ENDC)
+        print(BColors.OKBLUE + "API CALL: ", self.host + service + "/" + job_id + BColors.ENDC)
+
+        sql_req = requests.get(self.host + service + "/" + job_id, headers=headers)
+        rows = []
+        if sql_req.status_code != 200:
+            print(BColors.FAIL + "Error retrieving SQL data"
+                                 "\nStatus Code: {}"
+                                 "\nERROR Message: {}".format(sql_req.status_code, sql_req.reason) + BColors.ENDC)
+        else:
+            print(BColors.OKGREEN + "SQL Retrieval Successful!" + BColors.ENDC)
+
+            # Get Results
+            results = sql_req.json()["results"]
+            rows = results[0]["rows"]
+
+        return rows
+
+    def write_data(self, auth_token, license_plate):
+        """
+        =========================================================================================================
         Executes one or more SQL statements as a background job.
         This endpoint returns a job ID that can be used to retrieve the results.
 
@@ -190,7 +321,7 @@ class Db2Connection:
                 {
                     "id": "STRING",
                     "status": "STRING",
-                    "results": {
+                    "results": [{
                                     "command": "STRING",
                                     "columns": "ARRAY",
                                     "rows": "ARRAY",
@@ -201,78 +332,75 @@ class Db2Connection:
                                     "runtime_seconds": "DOUBLE",
                                     "error": "STRING"
                                 }
-                    }
+                    }]
 
-                The status field contains either completed, running or failed. It is possible that you only get an
+                The status field contains either "completed", "running" or "failed". It is possible that you only get an
                 intermediate result set (perhaps because the answer set is still being gathered) so running will be returned.
                 When the status is running, you may already have some data in the results field. You must retrieve this
                 data before issuing another request. The data that is returned is not cumulative which means any results
                 returned in the RESTful call are lost on the next call.
+
+                r = restful.get(...)
+                if (r.status == "failed") leave...
+                rows = get rows from r
+                while r.status == "running":
+                    r = restful.get(...)
+                    rows = get rows from r
+        =========================================================================================================
+        @param auth_token:
+        @param license_plate:
         """
 
         print(BColors.HEADER + "\nAttempting to write data in table: {} ...".format(self.logs_table) + BColors.ENDC)
+        print(BColors.HEADER + "Performing a SQL Query for License Plate {}".format(license_plate) + BColors.ENDC)
 
         service = "/sql_jobs"
         headers = {
             'authorization': "Bearer " + auth_token
         }
 
-    def create_table(self, auth_token, table_name):
         """
-        Create a new table.
-        CALL:
-            PUT /admin/tables
+        1. Query LICENSE_OCR for given license_plate and current date
+        2. If record exists - Update the record where Exit_time = time
+           Else: Insert a new record where Entry_Time = time
         """
-        print(BColors.HEADER + "\nAttempting to create table: {} under schema: {} ...".format(table_name,
-                                                                                              self.schema_name)
-              + BColors.ENDC)
-
-        service = "/admin/tables"
-
-        payload = {"LICENSE_OCR": {"schema": self.schema_name, "table": self.logs_table,
-                                   "column_info": [
-                                       {"data_type": "CHAR", "length": 10, "scale": {}, "column_name": "License_Plate",
-                                        "nullable": "true"},
-                                       {"data_type": "TIMESTAMP", "length": 10, "scale": {},
-                                        "column_name": "Entry_Time",
-                                        "nullable": "true"},
-                                       {"data_type": "TIMESTAMP", "length": 10, "scale": {}, "column_name": "Exit_Time",
-                                        "nullable": "true"}]
-                                   },
-                   "EMPLOYEE_DETAILS": {"schema": self.schema_name, "table": self.employee_details_table,
-                                        "column_info": [
-                                            {"data_type": "CHAR", "length": 20, "scale": {},
-                                             "column_name": "Employee_Name",
-                                             "nullable": "true"},
-                                            {"data_type": "CHAR", "length": 10, "scale": {},
-                                             "column_name": "License_Plate",
-                                             "nullable": "true"},
-                                            {"data_type": "CHAR", "length": 15, "scale": {},
-                                             "column_name": "Position",
-                                             "nullable": "true"}]}
-                   }
-        headers = {
-            'content-type': "application/json",
-            'authorization': "Bearer " + auth_token
+        sql_command = {
+            "commands": "SELECT * FROM LICENSE_OCR WHERE CURRENT_DATE = '{}' AND LICENSE_PLATE = '{}'".format(self.date,
+                                                                                                              license_plate),
+            "limit": 5,
+            "separator": ";",
+            "stop_on_error": "yes"
         }
+        print("SQL Statement: {}".format(sql_command["commands"]))
 
-        print("API CALL: ", self.host + service)
-        r = requests.put(self.host + service, data=json.dumps(payload[table_name]), headers=headers)
+        print(BColors.OKBLUE + "API CALL: ", self.host + service + BColors.ENDC)
+        r = requests.post(self.host + service, headers=headers, json=sql_command)
         if r.status_code == 201:
-            print(BColors.OKGREEN + "Successfully created table {}!".format(table_name) + BColors.ENDC)
+            print(BColors.OKGREEN + "SQL Query Successful!" + BColors.ENDC)
+
+            # Storing the Job_ID
+            job_id = r.json()["id"]
+            rows = self.retrieve_sql(service, job_id, headers)
+
+            if not rows:
+                self.insert_sql(service, license_plate, headers)
+            else:
+                # TODO: Perform SQL Query where "Exit_Time" = '' and retrieve data
+                #  if (row = []) - Insert new entry with entry_time = time
+                #  else update the row with Exit_Time = time
+                print(rows)
+
         else:
-            print(BColors.FAIL + "Error Creating Table."
+            print(BColors.FAIL + "Error executing SQL Statement."
                                  "\nStatus Code: {}"
-                                 "\nERROR Message: {}"
-                                 "\n\nExiting Application.".format(r.status_code, r.reason) + BColors.ENDC)
-            exit(-1)
+                                 "\nERROR Message: {}".format(r.status_code, r.reason) + BColors.ENDC)
 
 
 def main():
     # Get Credentials
+    # TODO: Ask best practices for credentials when dockerizing the application
     f = open("credentials.txt", "r")
     credentials = json.loads(f.read())
-    print(type(credentials))
     f.close()
 
     # Create a Db2Connection Object
@@ -290,7 +418,9 @@ def main():
         db2.create_table(auth_token, db2.employee_details_table)
 
     # Write Data
-    db2.write_data(auth_token)
+    # TODO: Ensure that the license_plate, time parameters are passed appropriately
+    license_plate = "BROTEST"
+    db2.write_data(auth_token, license_plate)
 
 
 if __name__ == "__main__":
