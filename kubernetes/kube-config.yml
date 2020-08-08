@@ -22,7 +22,7 @@ metadata:
 spec:
   containers:
     - name: ubuntu-ocr
-      image: kkbankol/ubuntu-ocr
+      image: kkbankol/ubuntu-ocr:latest
       imagePullPolicy: Always
       stdin: true
       tty: true

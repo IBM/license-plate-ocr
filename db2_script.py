@@ -39,20 +39,20 @@ class BColors:
 
 
 class Db2Connection:
-    def __init__(self):
+    def __init__(self, credentials):
         """
 
         """
-        self.credentials = {
-        }
-        self.api = "/dbapi/v4/"
+        self.credentials = credentials
+        self.api = "/dbapi/v4"
         self.host = self.credentials["https_url"] + self.api
         self.user_info = {
             "userid": self.credentials["username"],
             "password": self.credentials["password"]
         }
         self.schema_name = "NQL98658"
-        self.table_name = "LICENSE_OCR"
+        self.logs_table = "LICENSE_OCR"
+        self.employee_details_table = "EMPLOYEE_DETAILS"
 
     def authenticate(self):
         """
@@ -73,10 +73,11 @@ class Db2Connection:
         print(BColors.HEADER + "\n\nConnecting to the \'" + self.host + "\' server ...\n", end="" + BColors.ENDC)
 
         service = "/auth/tokens"
+        print("API CALL: ", self.host + service)
         r = requests.post(self.host + service, json=self.user_info)
 
         if r.status_code == 200:
-            print(BColors.OKGREEN + "Connection Successful" + BColors.ENDC)
+            print(BColors.OKGREEN + "Connection Successful!" + BColors.ENDC)
             return r
         else:
             print(BColors.FAIL + "Could not connect to {}",
@@ -121,8 +122,10 @@ class Db2Connection:
             'authorization': "Bearer " + auth_token
         }
         # GET request
+        print("API CALL: ", self.host + service)
         r = requests.get(self.host + service, headers=headers)
 
+        log_table = emp_table = False
         if r.status_code == 200:
             print(BColors.OKGREEN + "Data Successfully Collected." + BColors.ENDC)
             num_tables = r.json()["count"]
@@ -131,14 +134,16 @@ class Db2Connection:
             if num_tables != 0:
                 # Iterate through the resources to ensure that table LICENSE_OCR doesn't exist
                 for table in resources:
-                    if table["name"] == self.table_name:
-                        return True
+                    if table["name"] == self.logs_table:
+                        log_table = True
+                    if table["name"] == self.employee_details_table:
+                        emp_table = True
         else:
             print(BColors.FAIL + "Error Collecting Data."
                                  "\nStatus Code: {}"
                                  "\nERROR Message: {}".format(r.status_code, r.reason) + BColors.ENDC)
 
-        return False
+        return {"Logs": log_table, "Emp": emp_table}
 
     def write_data(self, auth_token):
         """
@@ -205,41 +210,56 @@ class Db2Connection:
                 returned in the RESTful call are lost on the next call.
         """
 
-        print(BColors.HEADER + "\nAttempting to write data in table: {} ...".format(self.table_name) + BColors.ENDC)
+        print(BColors.HEADER + "\nAttempting to write data in table: {} ...".format(self.logs_table) + BColors.ENDC)
 
         service = "/sql_jobs"
         headers = {
             'authorization': "Bearer " + auth_token
         }
 
-    def create_table(self, auth_token):
+    def create_table(self, auth_token, table_name):
         """
         Create a new table.
         CALL:
             PUT /admin/tables
         """
-        print(BColors.HEADER + "\nAttempting to create table: {} under schema: {} ...".format(self.table_name,
+        print(BColors.HEADER + "\nAttempting to create table: {} under schema: {} ...".format(table_name,
                                                                                               self.schema_name)
               + BColors.ENDC)
 
         service = "/admin/tables"
-        payload = {"schema": self.schema_name, "table": self.table_name,
-                   "column_info": [
-                       {"data_type": "CHAR", "length": 10, "scale": {}, "column_name": "License_Plate",
-                        "nullable": "true"},
-                       {"data_type": "TIMESTAMP", "length": 10, "scale": {}, "column_name": "Entry_Time",
-                        "nullable": "true"},
-                       {"data_type": "TIMESTAMP", "length": 10, "scale": {}, "column_name": "Exit_Time",
-                        "nullable": "true"}]
+
+        payload = {"LICENSE_OCR": {"schema": self.schema_name, "table": self.logs_table,
+                                   "column_info": [
+                                       {"data_type": "CHAR", "length": 10, "scale": {}, "column_name": "License_Plate",
+                                        "nullable": "true"},
+                                       {"data_type": "TIMESTAMP", "length": 10, "scale": {},
+                                        "column_name": "Entry_Time",
+                                        "nullable": "true"},
+                                       {"data_type": "TIMESTAMP", "length": 10, "scale": {}, "column_name": "Exit_Time",
+                                        "nullable": "true"}]
+                                   },
+                   "EMPLOYEE_DETAILS": {"schema": self.schema_name, "table": self.employee_details_table,
+                                        "column_info": [
+                                            {"data_type": "CHAR", "length": 20, "scale": {},
+                                             "column_name": "Employee_Name",
+                                             "nullable": "true"},
+                                            {"data_type": "CHAR", "length": 10, "scale": {},
+                                             "column_name": "License_Plate",
+                                             "nullable": "true"},
+                                            {"data_type": "CHAR", "length": 15, "scale": {},
+                                             "column_name": "Position",
+                                             "nullable": "true"}]}
                    }
         headers = {
             'content-type': "application/json",
             'authorization': "Bearer " + auth_token
         }
 
-        r = requests.put(self.host + service, data=json.dumps(payload), headers=headers)
+        print("API CALL: ", self.host + service)
+        r = requests.put(self.host + service, data=json.dumps(payload[table_name]), headers=headers)
         if r.status_code == 201:
-            print(BColors.OKGREEN + "Successfully created table!" + BColors.ENDC)
+            print(BColors.OKGREEN + "Successfully created table {}!".format(table_name) + BColors.ENDC)
         else:
             print(BColors.FAIL + "Error Creating Table."
                                  "\nStatus Code: {}"
@@ -249,11 +269,27 @@ class Db2Connection:
 
 
 def main():
-    db2 = Db2Connection()
+    # Get Credentials
+    f = open("credentials.txt", "r")
+    credentials = json.loads(f.read())
+    print(type(credentials))
+    f.close()
+
+    # Create a Db2Connection Object
+    db2 = Db2Connection(credentials)
+
+    # Authenticate with the database
     auth_req = db2.authenticate()
     auth_token = auth_req.json()["token"]
-    if not db2.schema_info(auth_token):
-        db2.create_table(auth_token)
+
+    # Check if required tables already exists; if not - create new tables
+    schema_info = db2.schema_info(auth_token)
+    if not schema_info["Logs"]:
+        db2.create_table(auth_token, db2.logs_table)
+    if not schema_info["Emp"]:
+        db2.create_table(auth_token, db2.employee_details_table)
+
+    # Write Data
     db2.write_data(auth_token)
 
 
