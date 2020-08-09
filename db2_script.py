@@ -3,21 +3,20 @@
 #                                                                                               #
 #  PURPOSE:  Script makes use of Db2 APIs to read, write and manipulate data from IBM DB        #
 #                                                                                               #
-#  API/Services Used:                                                                           #
-#  1. POST /auth/tokens                 :     AUTHENTICATION                                    #
-#  2. GET /schemas/{schema_name}/tables :                                                       #
-#  1. PUT /admin/tables                 :                                                       #
-#  1. POST /auth/tokens                                                                         #
+#  API/SERVICES USED:                                                                           #
+#    1. POST /auth/tokens                 :     AUTHENTICATION                                  #
+#    2. GET /schemas/{schema_name}/tables :     LIST TABLES IN GIVEN SCHEMA_NAME                #
+#    3. PUT /admin/tables                 :     CREATE A NEW TABLE                              #
+#    4. POST /sql_jobs                    :     EXECUTE SQL STATEMENTS                          #
 #                                                                                               #
 #  CALLING RESTFUL SERVICES:                                                                    #
-#                                                                                               #
 #  There are two types of RESTful calls that are used with Db2 on Cloud:                        #
 #     * GET - get results from a SQL request                                                    #
 #     * POST - Request an access token, or issue an SQL command                                 #
 #                                                                                               #
 #  All RESTful calls require the host IP address and the service URL:                           #
 #     * host - this is the IP address of the machine that is hosting Db2 on Cloud               #
-#     * api - the API library that is being used to communicate with Db2 on Cloud               #
+#     * api - the API library that is being used to communicate with Db2 on Cloud: "/dbapi/v4"  #
 #     * service - the service (API) that is being requested                                     #
 #                                                                                               #
 # ----------------------------------------------------------------------------------------------#
@@ -40,14 +39,9 @@ class BColors:
 
 
 class Db2Connection:
-    """
-
-    """
 
     def __init__(self, credentials):
-        """
 
-        """
         self.credentials = credentials
         self.api = "/dbapi/v4"
         self.host = self.credentials["https_url"] + self.api
@@ -65,6 +59,7 @@ class Db2Connection:
 
     def authenticate(self):
         """
+        =========================================================================================================
         Authenticates the user credentials and returns an access token that can be used when invoking the operations.
         CALL:
             POST /auth/tokens
@@ -77,8 +72,8 @@ class Db2Connection:
 
         The access token is valid for about an hour which means you will have to refresh it if you've been away for a while.
         =========================================================================================================
-
         @return results returned by the RESTful call
+        =========================================================================================================
         """
         print(BColors.HEADER + "\n\nConnecting to the \'" + self.host + "\' server ...\n", end="" + BColors.ENDC)
 
@@ -126,7 +121,9 @@ class Db2Connection:
         =========================================================================================================
         @param auth_token:
         @return:
+        =========================================================================================================
         """
+
         print(BColors.HEADER + "\nAttempting to Collect data from schema {} ...".format(self.schema_name)
               + BColors.ENDC)
 
@@ -153,7 +150,7 @@ class Db2Connection:
                     if table["name"] == self.employee_details_table:
                         emp_table = True
         else:
-            print(BColors.FAIL + "Error Collecting Data."
+            print(BColors.FAIL + "Error Collecting Schema Data."
                                  "\nStatus Code: {}"
                                  "\nERROR Message: {}".format(r.status_code, r.reason) + BColors.ENDC)
 
@@ -161,14 +158,15 @@ class Db2Connection:
 
     def create_table(self, auth_token, table_name):
         """
+        =========================================================================================================
         Create a new table.
         CALL:
             PUT /admin/tables
         =========================================================================================================
-
         @param auth_token:
         @param table_name:
         @return:
+        =========================================================================================================
         """
         print(BColors.HEADER + "\nAttempting to create table: {} under schema: {} ...".format(table_name,
                                                                                               self.schema_name)
@@ -218,25 +216,46 @@ class Db2Connection:
 
     def insert_sql(self, service, license_plate, headers):
         """
+        =========================================================================================================
+        Executes a SQL Insert Statement to create a new entry
+        CALL:
+            POST /sql_jobs
 
+        STRUCTURE OF SQL REQUEST:
+            {
+                "commands": "sql",
+                "limit", x,
+                "separator": ";",
+                "stop_on_error": "yes"
+            }
+
+        The parameters are as follows:
+            * commands - The SQL script to be executed (could be multiple statements)
+            * limit - Maximum number of rows that will be fetched for each result set
+            * separator - SQL statement terminator. A character that is used to mark the end of a SQL statement when
+                          the provided SQL script contains multiple statements.
+            * stop_on_error - If 'yes', the job stops executing at the first statement that returns an error. If 'no',
+                              the job continues executing if one or more statements returns an error.
         =========================================================================================================
         @param service:
         @param license_plate:
         @param headers:
         @return:
+        =========================================================================================================
         """
+
         print(BColors.HEADER + "\nPerforming an Insert Query for License Plate {}".format(license_plate)
               + BColors.ENDC)
 
         insert_command = {
-            "commands": "INSERT INTO LICENSE_OCR"
+            "commands": "INSERT INTO \"NQL98658\".\"LICENSE_OCR\" "
                         "(\"LICENSE_PLATE\",\"ENTRY_TIME\",\"EXIT_TIME\",\"CURRENT_DATE\") "
                         "VALUES('{}','{}', NULL, '{}');".format(license_plate, self.time, self.date),
             "limit": {},
             "separator": ";",
             "stop_on_error": "yes"
         }
-        print("Insert Statement: {}".format(insert_command["commands"]))
+        print("SQL Insert Statement: {}".format(insert_command["commands"]))
         print(BColors.OKBLUE + "API CALL: ", self.host + service + BColors.ENDC)
 
         insert_req = requests.post(self.host + service, headers=headers, json=insert_command)
@@ -244,18 +263,58 @@ class Db2Connection:
             print(BColors.OKGREEN + "SQL Insert Successful!" + BColors.ENDC)
         else:
             print(BColors.FAIL + "Error Inserting Data"
+                                 "\nSQL Statement: {}"
                                  "\nStatus Code: {}"
-                                 "\nERROR Message: {}".format(insert_req.status_code, insert_req.reason) + BColors.ENDC)
+                                 "\nERROR Message: {}".format(insert_command["commands"],
+                                                              insert_req.status_code, insert_req.reason) + BColors.ENDC)
 
     def retrieve_sql(self, service, job_id, headers):
         """
+        =========================================================================================================
+        Now that the SQL statement has been set off for execution, we must request the results.
+        The RESTful API is exactly the same as requesting the SQL to be run, but you need to add the job id to the
+        end of the service.
 
+        CALL:
+            GET /sql_jobs/{id}
+
+        RESPONSE:
+            {
+                "id": "STRING",
+                "status": "STRING",
+                "results": [{
+                                "command": "STRING",
+                                "columns": "ARRAY",
+                                "rows": "ARRAY",
+                                "rows_count": "INTEGER",
+                                "limit": "INTEGER",
+                                "last_inserted": "INTEGER",
+                                "rows_affected": "INTEGER",
+                                "runtime_seconds": "DOUBLE",
+                                "error": "STRING"
+                            }
+                }]
+
+            The status field contains either "completed", "running" or "failed". It is possible that you only get an
+            intermediate result set (perhaps because the answer set is still being gathered) so running will be returned.
+            When the status is running, you may already have some data in the results field. You must retrieve this
+            data before issuing another request. The data that is returned is not cumulative which means any results
+            returned in the RESTful call are lost on the next call.
+
+                r = restful.get(...)
+                if (r.status == "failed") leave...
+                rows = get rows from r
+                while r.status == "running":
+                    r = restful.get(...)
+                    rows = get rows from r
         =========================================================================================================
         @param service:
         @param job_id:
         @param headers:
         @return:
+        =========================================================================================================
         """
+
         # Retrieving the SQL Results
         print(BColors.HEADER + "\nAttempting to Retrieve SQL Data ..." + BColors.ENDC)
         print(BColors.OKBLUE + "API CALL: ", self.host + service + "/" + job_id + BColors.ENDC)
@@ -275,6 +334,62 @@ class Db2Connection:
 
         return rows
 
+    def update_item(self, service, license_plate, headers):
+        """
+        Executes a SQL Update Statement to update attributes of an entry
+
+        CALL:
+            POST /sql_jobs
+
+        STRUCTURE OF SQL REQUEST:
+            {
+                "commands": "sql",
+                "limit", x,
+                "separator": ";",
+                "stop_on_error": "yes"
+            }
+
+        The parameters are as follows:
+            * commands - The SQL script to be executed (could be multiple statements)
+            * limit - Maximum number of rows that will be fetched for each result set
+            * separator - SQL statement terminator. A character that is used to mark the end of a SQL statement when
+                          the provided SQL script contains multiple statements.
+            * stop_on_error - If 'yes', the job stops executing at the first statement that returns an error. If 'no',
+                              the job continues executing if one or more statements returns an error.
+        =========================================================================================================
+        @param service:
+        @param license_plate:
+        @param headers:
+        @return:
+        =========================================================================================================
+        """
+
+        print(BColors.HEADER + "\nPerforming an Update Query for License Plate {}".format(license_plate) + BColors.ENDC)
+
+        update_command = {
+            "commands": "UPDATE \"NQL98658\".\"LICENSE_OCR\" "
+                        "SET \"EXIT_TIME\" = '{}' "
+                        "WHERE \"NQL98658\".\"LICENSE_OCR\".\"CURRENT_DATE\" = '{}' "
+                        "AND \"NQL98658\".\"LICENSE_OCR\".\"LICENSE_PLATE\" = '{}' "
+                        "AND \"NQL98658\".\"LICENSE_OCR\".\"EXIT_TIME\" IS NULL;".format(self.time, self.date,
+                                                                                         license_plate),
+            "limit": {},
+            "separator": ";",
+            "stop_on_error": "yes"
+        }
+        print("SQL Update Statement: {}".format(update_command["commands"]))
+        print(BColors.OKBLUE + "API CALL: ", self.host + service + BColors.ENDC)
+
+        update_req = requests.post(self.host + service, headers=headers, json=update_command)
+        if update_req.status_code == 201:
+            print(BColors.OKGREEN + "SQL Update Successful!" + BColors.ENDC)
+        else:
+            print(BColors.FAIL + "Error Inserting Data"
+                                 "\nSQL Statement: {}"
+                                 "\nStatus Code: {}"
+                                 "\nERROR Message: {}".format(update_command["commands"],
+                                                              update_req.status_code, update_req.reason) + BColors.ENDC)
+
     def write_data(self, auth_token, license_plate):
         """
         =========================================================================================================
@@ -283,7 +398,6 @@ class Db2Connection:
 
         CALL:
             POST /sql_jobs
-            GET /sql_jobs/{id}
 
         STRUCTURE OF SQL REQUEST:
             {
@@ -309,46 +423,10 @@ class Db2Connection:
             }
 
         Keep track of the "id" field as it is used to track the execution of SQL command(s).
-
-        RETRIEVING SQL RESULT:
-            Now that the SQL statement has been set off for execution, we must request the results.
-            The RESTful API is exactly the same as requesting the SQL to be run, but you need to add the job id to the
-            end of the service.
-
-            GET /sql_jobs/{id}
-
-            RESPONSE:
-                {
-                    "id": "STRING",
-                    "status": "STRING",
-                    "results": [{
-                                    "command": "STRING",
-                                    "columns": "ARRAY",
-                                    "rows": "ARRAY",
-                                    "rows_count": "INTEGER",
-                                    "limit": "INTEGER",
-                                    "last_inserted": "INTEGER",
-                                    "rows_affected": "INTEGER",
-                                    "runtime_seconds": "DOUBLE",
-                                    "error": "STRING"
-                                }
-                    }]
-
-                The status field contains either "completed", "running" or "failed". It is possible that you only get an
-                intermediate result set (perhaps because the answer set is still being gathered) so running will be returned.
-                When the status is running, you may already have some data in the results field. You must retrieve this
-                data before issuing another request. The data that is returned is not cumulative which means any results
-                returned in the RESTful call are lost on the next call.
-
-                r = restful.get(...)
-                if (r.status == "failed") leave...
-                rows = get rows from r
-                while r.status == "running":
-                    r = restful.get(...)
-                    rows = get rows from r
         =========================================================================================================
         @param auth_token:
         @param license_plate:
+        =========================================================================================================
         """
 
         print(BColors.HEADER + "\nAttempting to write data in table: {} ...".format(self.logs_table) + BColors.ENDC)
@@ -359,14 +437,12 @@ class Db2Connection:
             'authorization': "Bearer " + auth_token
         }
 
-        """
-        1. Query LICENSE_OCR for given license_plate and current date
-        2. If record exists - Update the record where Exit_time = time
-           Else: Insert a new record where Entry_Time = time
-        """
         sql_command = {
-            "commands": "SELECT * FROM LICENSE_OCR WHERE CURRENT_DATE = '{}' AND LICENSE_PLATE = '{}'".format(self.date,
-                                                                                                              license_plate),
+            "commands": "SELECT * "
+                        "FROM \"NQL98658\".\"LICENSE_OCR\" "
+                        "WHERE \"NQL98658\".\"LICENSE_OCR\".\"CURRENT_DATE\" = '{}' "
+                        "AND \"NQL98658\".\"LICENSE_OCR\".\"LICENSE_PLATE\" = '{}'".format(self.date,
+                                                                                           license_plate),
             "limit": 5,
             "separator": ";",
             "stop_on_error": "yes"
@@ -385,15 +461,22 @@ class Db2Connection:
             if not rows:
                 self.insert_sql(service, license_plate, headers)
             else:
-                # TODO: Perform SQL Query where "Exit_Time" = '' and retrieve data
-                #  if (row = []) - Insert new entry with entry_time = time
-                #  else update the row with Exit_Time = time
-                print(rows)
+                update_flag = False
+                # Parse the SQL Data to check if Exit_Time IS NULL
+                for entry in rows:
+                    if entry[-2] == '':
+                        update_flag = True
+                if update_flag:
+                    self.update_item(service, license_plate, headers)
+                else:
+                    self.insert_sql(service, license_plate, headers)
 
         else:
             print(BColors.FAIL + "Error executing SQL Statement."
+                                 "\nSQL Statement: {}"
                                  "\nStatus Code: {}"
-                                 "\nERROR Message: {}".format(r.status_code, r.reason) + BColors.ENDC)
+                                 "\nERROR Message: {}".format(sql_command["commands"],
+                                                              r.status_code, r.reason) + BColors.ENDC)
 
 
 def main():
@@ -419,7 +502,8 @@ def main():
 
     # Write Data
     # TODO: Ensure that the license_plate, time parameters are passed appropriately
-    license_plate = "BROTEST"
+    #  ##### Auth_Token expires after 1 hr. => ensure to renew token every 55 mins
+    license_plate = "22233"
     db2.write_data(auth_token, license_plate)
 
 
