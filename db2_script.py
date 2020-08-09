@@ -61,6 +61,7 @@ class Db2Connection:
         """
         =========================================================================================================
         Authenticates the user credentials and returns an access token that can be used when invoking the operations.
+
         CALL:
             POST /auth/tokens
 
@@ -119,8 +120,8 @@ class Db2Connection:
                 * name - The table name
                 * schema - The schema name
         =========================================================================================================
-        @param auth_token:
-        @return:
+        @param auth_token: Authentication token; required to perform RESTful Calls
+        @return: Dict containing flags indicating which tables are present in given schema
         =========================================================================================================
         """
 
@@ -160,12 +161,13 @@ class Db2Connection:
         """
         =========================================================================================================
         Create a new table.
+
         CALL:
             PUT /admin/tables
         =========================================================================================================
-        @param auth_token:
-        @param table_name:
-        @return:
+        @param auth_token: Authentication token; required to perform RESTful Calls
+        @param table_name: Name of the table to be created
+        @return: None
         =========================================================================================================
         """
         print(BColors.HEADER + "\nAttempting to create table: {} under schema: {} ...".format(table_name,
@@ -237,10 +239,10 @@ class Db2Connection:
             * stop_on_error - If 'yes', the job stops executing at the first statement that returns an error. If 'no',
                               the job continues executing if one or more statements returns an error.
         =========================================================================================================
-        @param service:
-        @param license_plate:
-        @param headers:
-        @return:
+        @param service: the service (API) that is being requested
+        @param license_plate: Detected license plate of the vehicle
+        @param headers: Auth headers
+        @return: None
         =========================================================================================================
         """
 
@@ -292,8 +294,8 @@ class Db2Connection:
                                 "rows_affected": "INTEGER",
                                 "runtime_seconds": "DOUBLE",
                                 "error": "STRING"
-                            }
-                }]
+                            }]
+                }
 
             The status field contains either "completed", "running" or "failed". It is possible that you only get an
             intermediate result set (perhaps because the answer set is still being gathered) so running will be returned.
@@ -308,10 +310,10 @@ class Db2Connection:
                     r = restful.get(...)
                     rows = get rows from r
         =========================================================================================================
-        @param service:
-        @param job_id:
-        @param headers:
-        @return:
+        @param service: the service (API) that is being requested
+        @param job_id: ID used to track execution of SQL Command
+        @param headers: Auth headers
+        @return: rows: List of SQL Results
         =========================================================================================================
         """
 
@@ -332,6 +334,7 @@ class Db2Connection:
             results = sql_req.json()["results"]
             rows = results[0]["rows"]
 
+        # TODO: Pandas dataframe?
         return rows
 
     def update_item(self, service, license_plate, headers):
@@ -357,10 +360,10 @@ class Db2Connection:
             * stop_on_error - If 'yes', the job stops executing at the first statement that returns an error. If 'no',
                               the job continues executing if one or more statements returns an error.
         =========================================================================================================
-        @param service:
-        @param license_plate:
-        @param headers:
-        @return:
+        @param service: the service (API) that is being requested
+        @param license_plate: Detected license plate of the vehicle
+        @param headers: Auth headers
+        @return: None
         =========================================================================================================
         """
 
@@ -424,8 +427,9 @@ class Db2Connection:
 
         Keep track of the "id" field as it is used to track the execution of SQL command(s).
         =========================================================================================================
-        @param auth_token:
-        @param license_plate:
+        @param auth_token: Authentication token; required to perform RESTful Calls
+        @param license_plate: Detected license plate of the vehicle
+        @return None
         =========================================================================================================
         """
 
