@@ -16,6 +16,20 @@ import statistics
 from pytesseract import Output
 
 
+# TODO:
+#   1) Write scripts using VI APIs to connect the IP Camera to the VI Server [Python Script]
+#         IP Camera WiFI -> Photo/Video to VI Server
+#         24/7
+#   2) Maybe: Scale Up our Kubernetes Cluster - 4Cores 16GB RAM
+#           Scale Up Db2 Instance to store more data (We're using free instance currently)
+#           Cognos
+#   3) Securely store access keys - Auth_Token generated once every hour
+#   4) Application:
+#     # Flag guest license plates > 2 hrs
+#     # Drill on the license plate - to get entire INs and OUTs of the license plate
+#     # Time frame comparison - how many violations over a week (per day)
+
+
 # import process_image
 
 class S(BaseHTTPRequestHandler):

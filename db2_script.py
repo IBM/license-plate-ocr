@@ -21,21 +21,10 @@
 #                                                                                               #
 # ----------------------------------------------------------------------------------------------#
 
-# Load The Appropriate Python Modules
+# Load The Required Python Modules
 import json
 import requests
 from datetime import datetime
-
-
-class BColors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
 
 class Db2Connection:
@@ -56,6 +45,7 @@ class Db2Connection:
 
         self.date = datetime.today().strftime('%Y-%m-%d')
         self.time = datetime.now().strftime('%H:%M:%S')
+        self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
 
     def authenticate(self):
         """
@@ -142,6 +132,7 @@ class Db2Connection:
             print(BColors.OKGREEN + "Data Successfully Collected!" + BColors.ENDC)
             num_tables = r.json()["count"]
             resources = r.json()["resources"]
+            print(resources)
 
             if num_tables != 0:
                 # Iterate through the resources to ensure that table LICENSE_OCR doesn't exist
@@ -176,29 +167,30 @@ class Db2Connection:
 
         service = "/admin/tables"
 
-        payload = {"LICENSE_OCR": {"schema": self.schema_name, "table": self.logs_table,
-                                   "column_info": [
-                                       {"data_type": "CHAR", "length": 10, "scale": {}, "column_name": "License_Plate",
-                                        "nullable": "true"},
-                                       {"data_type": "TIME", "length": {}, "scale": {}, "column_name": "Entry_Time",
-                                        "nullable": "true"},
-                                       {"data_type": "TIME", "length": {}, "scale": {}, "column_name": "Exit_Time",
-                                        "nullable": "true"},
-                                       {"data_type": "DATE", "length": {}, "scale": {}, "column_name": "Current_Date",
-                                        "nullable": "true"}]
-                                   },
-                   "EMPLOYEE_DETAILS": {"schema": self.schema_name, "table": self.employee_details_table,
-                                        "column_info": [
-                                            {"data_type": "CHAR", "length": 20, "scale": {},
-                                             "column_name": "Employee_Name",
-                                             "nullable": "true"},
-                                            {"data_type": "CHAR", "length": 10, "scale": {},
-                                             "column_name": "License_Plate",
-                                             "nullable": "true"},
-                                            {"data_type": "CHAR", "length": 15, "scale": {},
-                                             "column_name": "Position",
-                                             "nullable": "true"}]
-                                        }
+        payload = {self.logs_table: {"schema": self.schema_name, "table": self.logs_table,
+                                     "column_info": [
+                                         {"data_type": "CHAR", "length": 10, "scale": {},
+                                          "column_name": "License_Plate",
+                                          "nullable": "true"},
+                                         {"data_type": "TIMESTAMP", "length": {}, "scale": {},
+                                          "column_name": "Timestamp",
+                                          "nullable": "false"},
+                                         {"data_type": "CHAR", "length": 5, "scale": {},
+                                          "column_name": "Entry/Exit",
+                                          "nullable": "false"}]
+                                     },
+                   self.employee_details_table: {"schema": self.schema_name, "table": self.employee_details_table,
+                                                 "column_info": [
+                                                     {"data_type": "CHAR", "length": 20, "scale": {},
+                                                      "column_name": "Employee_Name",
+                                                      "nullable": "true"},
+                                                     {"data_type": "CHAR", "length": 10, "scale": {},
+                                                      "column_name": "License_Plate",
+                                                      "nullable": "true"},
+                                                     {"data_type": "CHAR", "length": 15, "scale": {},
+                                                      "column_name": "Position",
+                                                      "nullable": "true"}]
+                                                 }
                    }
         headers = {
             'content-type': "application/json",
@@ -216,10 +208,10 @@ class Db2Connection:
                                  "\n\nExiting Application.".format(r.status_code, r.reason) + BColors.ENDC)
             exit(-1)
 
-    def insert_sql(self, service, license_plate, headers):
+    def entry(self, service, license_plate, headers):
         """
         =========================================================================================================
-        Executes a SQL Insert Statement to create a new entry
+        Executes a SQL Insert Statement to create a new entry - either entry or exit based on flag
         CALL:
             POST /sql_jobs
 
@@ -246,18 +238,17 @@ class Db2Connection:
         =========================================================================================================
         """
 
-        print(BColors.HEADER + "\nPerforming an Insert Query for License Plate {}".format(license_plate)
+        print(BColors.HEADER + "\nLicense Plate {} is entering the location.".format(license_plate)
               + BColors.ENDC)
 
         insert_command = {
-            "commands": "INSERT INTO \"NQL98658\".\"LICENSE_OCR\" "
-                        "(\"LICENSE_PLATE\",\"ENTRY_TIME\",\"EXIT_TIME\",\"CURRENT_DATE\") "
-                        "VALUES('{}','{}', NULL, '{}');".format(license_plate, self.time, self.date),
+            "commands": "INSERT INTO  \"NQL98658\".\"LICENSE_OCR\" (\"LICENSE_PLATE\",\"TIMESTAMP\",\"Entry/Exit\") "
+                        "VALUES('{}', '{}','Entry');".format(license_plate, self.timestamp),
             "limit": {},
             "separator": ";",
             "stop_on_error": "yes"
         }
-        print("SQL Insert Statement: {}".format(insert_command["commands"]))
+        print("SQL Statement: {}".format(insert_command["commands"]))
         print(BColors.OKBLUE + "API CALL: ", self.host + service + BColors.ENDC)
 
         insert_req = requests.post(self.host + service, headers=headers, json=insert_command)
@@ -337,7 +328,7 @@ class Db2Connection:
         # TODO: Pandas dataframe?
         return rows
 
-    def update_item(self, service, license_plate, headers):
+    def exit(self, service, license_plate, headers):
         """
         Executes a SQL Update Statement to update attributes of an entry
 
@@ -367,31 +358,37 @@ class Db2Connection:
         =========================================================================================================
         """
 
-        print(BColors.HEADER + "\nPerforming an Update Query for License Plate {}".format(license_plate) + BColors.ENDC)
+        print(BColors.HEADER + "\nLicense Plate {} is exiting the location.".format(license_plate) + BColors.ENDC)
 
-        update_command = {
-            "commands": "UPDATE \"NQL98658\".\"LICENSE_OCR\" "
-                        "SET \"EXIT_TIME\" = '{}' "
-                        "WHERE \"NQL98658\".\"LICENSE_OCR\".\"CURRENT_DATE\" = '{}' "
-                        "AND \"NQL98658\".\"LICENSE_OCR\".\"LICENSE_PLATE\" = '{}' "
-                        "AND \"NQL98658\".\"LICENSE_OCR\".\"EXIT_TIME\" IS NULL;".format(self.time, self.date,
-                                                                                         license_plate),
+        exit_command = {
+            "commands": "INSERT INTO  \"NQL98658\".\"LICENSE_OCR\" (\"LICENSE_PLATE\",\"TIMESTAMP\",\"Entry/Exit\") "
+                        "VALUES('{}', '{}','Exit');".format(license_plate, self.timestamp),
             "limit": {},
             "separator": ";",
             "stop_on_error": "yes"
         }
-        print("SQL Update Statement: {}".format(update_command["commands"]))
+        print("SQL Statement: {}".format(exit_command["commands"]))
         print(BColors.OKBLUE + "API CALL: ", self.host + service + BColors.ENDC)
 
-        update_req = requests.post(self.host + service, headers=headers, json=update_command)
-        if update_req.status_code == 201:
+        exit_req = requests.post(self.host + service, headers=headers, json=exit_command)
+        if exit_req.status_code == 201:
             print(BColors.OKGREEN + "SQL Update Successful!" + BColors.ENDC)
         else:
             print(BColors.FAIL + "Error Inserting Data"
                                  "\nSQL Statement: {}"
                                  "\nStatus Code: {}"
-                                 "\nERROR Message: {}".format(update_command["commands"],
-                                                              update_req.status_code, update_req.reason) + BColors.ENDC)
+                                 "\nERROR Message: {}".format(exit_command["commands"],
+                                                              exit_req.status_code, exit_req.reason) + BColors.ENDC)
+
+    # TODO: License_plate    Time       Date      Entry/Exit
+    #  Instead of recording pairs, just record individual entry and exit time/date
+
+    """
+    select *
+    from LICENSE_OCR_TEST_TIMESTAMP ocr
+    where ocr.LICENSE_PLATE = '22233'
+        and ocr.TIMESTAMP = (select max(ocr2.TIMESTAMP) from LICENSE_OCR_TEST_TIMESTAMP ocr2 where ocr2.LICENSE_PLATE = ocr.LICENSE_PLATE);
+    """
 
     def write_data(self, auth_token, license_plate):
         """
@@ -437,16 +434,17 @@ class Db2Connection:
         print(BColors.HEADER + "Performing a SQL Query for License Plate {}".format(license_plate) + BColors.ENDC)
 
         service = "/sql_jobs"
+
         headers = {
             'authorization': "Bearer " + auth_token
         }
 
         sql_command = {
             "commands": "SELECT * "
-                        "FROM \"NQL98658\".\"LICENSE_OCR\" "
-                        "WHERE \"NQL98658\".\"LICENSE_OCR\".\"CURRENT_DATE\" = '{}' "
-                        "AND \"NQL98658\".\"LICENSE_OCR\".\"LICENSE_PLATE\" = '{}'".format(self.date,
-                                                                                           license_plate),
+                        "FROM \"NQL98658\".\"LICENSE_OCR\" ocr "
+                        "WHERE ocr.\"LICENSE_PLATE\" = '{}' "
+                        "AND ocr.\"TIMESTAMP\" = (SELECT MAX(ocr2.TIMESTAMP) FROM \"NQL98658\".\"LICENSE_OCR\" ocr2 "
+                        "WHERE ocr2.\"LICENSE_PLATE\" = ocr.\"LICENSE_PLATE\")".format(license_plate),
             "limit": 5,
             "separator": ";",
             "stop_on_error": "yes"
@@ -462,18 +460,12 @@ class Db2Connection:
             job_id = r.json()["id"]
             rows = self.retrieve_sql(service, job_id, headers)
 
-            if not rows:
-                self.insert_sql(service, license_plate, headers)
+            if (not rows) or ("Exit" in rows[0][-1]):
+                print("Perform Entry: ", rows)
+                self.entry(service, license_plate, headers)
             else:
-                update_flag = False
-                # Parse the SQL Data to check if Exit_Time IS NULL
-                for entry in rows:
-                    if entry[-2] == '':
-                        update_flag = True
-                if update_flag:
-                    self.update_item(service, license_plate, headers)
-                else:
-                    self.insert_sql(service, license_plate, headers)
+                print("Perform Exit", rows)
+                self.exit(service, license_plate, headers)
 
         else:
             print(BColors.FAIL + "Error executing SQL Statement."
@@ -483,9 +475,20 @@ class Db2Connection:
                                                               r.status_code, r.reason) + BColors.ENDC)
 
 
+class BColors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 def main():
     # Get Credentials
-    # TODO: Ask best practices for credentials when dockerizing the application
+    # TODO: Ask best practices for storing credentials when dockerizing the application
     f = open("credentials.txt", "r")
     credentials = json.loads(f.read())
     f.close()
@@ -507,7 +510,7 @@ def main():
     # Write Data
     # TODO: Ensure that the license_plate, time parameters are passed appropriately
     #  ##### Auth_Token expires after 1 hr. => ensure to renew token every 55 mins
-    license_plate = "22233"
+    license_plate = "22333"
     db2.write_data(auth_token, license_plate)
 
 
