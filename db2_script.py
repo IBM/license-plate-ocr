@@ -26,6 +26,13 @@ import json
 import requests
 from datetime import datetime
 
+"""
+VI Server -> Kube Cluster     
+             1) ocr_server.py
+             2) db2_script.py ----------> write data into DB2
+                - credentials.txt
+"""
+
 
 class Db2Connection:
 
@@ -380,16 +387,6 @@ class Db2Connection:
                                  "\nERROR Message: {}".format(exit_command["commands"],
                                                               exit_req.status_code, exit_req.reason) + BColors.ENDC)
 
-    # TODO: License_plate    Time       Date      Entry/Exit
-    #  Instead of recording pairs, just record individual entry and exit time/date
-
-    """
-    select *
-    from LICENSE_OCR_TEST_TIMESTAMP ocr
-    where ocr.LICENSE_PLATE = '22233'
-        and ocr.TIMESTAMP = (select max(ocr2.TIMESTAMP) from LICENSE_OCR_TEST_TIMESTAMP ocr2 where ocr2.LICENSE_PLATE = ocr.LICENSE_PLATE);
-    """
-
     def write_data(self, auth_token, license_plate):
         """
         =========================================================================================================
@@ -489,7 +486,7 @@ class BColors:
 def main():
     # Get Credentials
     # TODO: Ask best practices for storing credentials when dockerizing the application
-    f = open("credentials.txt", "r")
+    f = open("kubernetes/credentials.txt", "r")
     credentials = json.loads(f.read())
     f.close()
 

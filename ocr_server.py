@@ -14,6 +14,7 @@ import sys
 from datetime import datetime
 import statistics
 from pytesseract import Output
+from db2_script import Db2Connection
 
 
 # TODO:

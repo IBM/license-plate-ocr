@@ -23,6 +23,12 @@ spec:
   containers:
     - name: ubuntu-ocr
       image: kkbankol/ubuntu-ocr:latest
+      env:
+        - name: CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              name: db2-credentials
+              key: credentials.txt
       imagePullPolicy: Always
       stdin: true
       tty: true
