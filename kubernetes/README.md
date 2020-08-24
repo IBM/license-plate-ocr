@@ -72,7 +72,7 @@ Let's create a secret and name it `db2-credentials` where we will pass our crede
     kubectl describe secrets db2-credentials
     ```
    Output:
-   ```
+   ```yaml
     Name:         db2-credentials
     Namespace:    default
     Labels:       <none>
@@ -169,3 +169,7 @@ spec:
    kubectl exec ubuntu-ocr env
    ```
    Output: Lists out the env vars for the pod ubuntu-ocr
+
+## Reference:
+1. https://kubernetes.io/docs/concepts/configuration/secret/
+2. https://www.youtube.com/watch?v=tZEKGNnvBzg

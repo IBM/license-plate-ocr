@@ -22,7 +22,7 @@ metadata:
 spec:
   containers:
     - name: ubuntu-ocr
-      image: kkbankol/ubuntu-ocr:latest
+      image: hnmehta/license_ocr:1
       env:
         - name: CREDENTIALS
           valueFrom:
@@ -34,3 +34,4 @@ spec:
       tty: true
       command: ["/usr/bin/python3"]
       args: ["ocr_server.py"]
+#      args: ["db2_script.py"]

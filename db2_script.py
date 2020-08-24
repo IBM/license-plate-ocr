@@ -25,13 +25,7 @@
 import json
 import requests
 from datetime import datetime
-
-"""
-VI Server -> Kube Cluster     
-             1) ocr_server.py
-             2) db2_script.py ----------> write data into DB2
-                - credentials.txt
-"""
+import os
 
 
 class Db2Connection:
@@ -485,10 +479,11 @@ class BColors:
 
 def main():
     # Get Credentials
-    # TODO: Ask best practices for storing credentials when dockerizing the application
-    f = open("kubernetes/credentials.txt", "r")
-    credentials = json.loads(f.read())
-    f.close()
+        # f = open("kubernetes/credentials.txt", "r")
+        # credentials = json.loads(f.read())
+        # f.close()
+    credentials = json.loads(os.environ['CREDENTIALS'])
+    print(credentials)
 
     # Create a Db2Connection Object
     db2 = Db2Connection(credentials)

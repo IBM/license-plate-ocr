@@ -11,10 +11,10 @@ import numpy as np
 from scipy import ndimage
 import statistics
 import sys
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import statistics
 from pytesseract import Output
-from db2_script import Db2Connection
+from db2_script import Db2Connection, BColors
 
 
 # TODO:
@@ -111,7 +111,7 @@ ocr_results = []
 def detect_tilt(dst):
     # get largest contour, use top two points as reference for rotation
     # pass canny
-    edge_contours, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    _, edge_contours, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     recs = []
     areas = {}
     max_area = 0
@@ -119,7 +119,7 @@ def detect_tilt(dst):
     for con in edge_contours:
         x, y, w, h = cv2.boundingRect(con)
         # if ( ((3 * h) > w) and (w > (1.7 * h))):
-        if (w > (1.5 * h)):
+        if w > (1.5 * h):
             area = w * h
             if area > max_area:
                 print("updating max area")
@@ -275,7 +275,7 @@ def process_image(image, lpr=None):
         dst[height - int(height / 5):-1, :] = opened_dst
 
     # dst = cv2.Canny(reduced_thresh, 50, 150)
-    contours_upped, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    _, contours_upped, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     '''
     determine which contours contain letters based off approximate area
@@ -316,6 +316,7 @@ def process_image(image, lpr=None):
     tess_config = "-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 --psm 6"
     text = pytesseract.image_to_string(stencil, config=tess_config, lang="eng")
     print(text)
+    db2.write_data(auth_token, text)
     return text
 
 
@@ -331,11 +332,25 @@ def run(server_class=HTTPServer, handler_class=S, addr="0.0.0.0", port=8000):
     httpd.serve_forever()
 
 
+# Creating a DB2 Instance
+credentials = json.loads(os.environ['CREDENTIALS'])
+db2 = Db2Connection(credentials)
+# Authenticate with the database
+auth_req = db2.authenticate()
+auth_token = auth_req.json()["token"]
+# Check if required tables already exists; if not - create new tables
+schema_info = db2.schema_info(auth_token)
+if not schema_info["Logs"]:
+    db2.create_table(auth_token, db2.logs_table)
+if not schema_info["Emp"]:
+    db2.create_table(auth_token, db2.employee_details_table)
+
+
 if len(sys.argv) == 2:
     image_filename = sys.argv[1]
     image = cv2.imread(image_filename)
     process_image(image)
-elif (len(sys.argv) == 3):
+elif len(sys.argv) == 3:
     image_filename = sys.argv[1]
     results_path = sys.argv[2]
     results = eval(open(results_path).read())
