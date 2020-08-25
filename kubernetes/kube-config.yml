@@ -22,7 +22,7 @@ metadata:
 spec:
   containers:
     - name: ubuntu-ocr
-      image: hnmehta/license_ocr:1
+      image: hnmehta/license_ocr:tess4
       env:
         - name: DEBUG
           value: "true"
@@ -35,4 +35,4 @@ spec:
       stdin: true
       tty: true
       command: ["/usr/bin/python3"]
-      args: ["ocr_server.py"]
+      args: ["ocr_server_tess4.py"]
