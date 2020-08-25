@@ -111,7 +111,7 @@ ocr_results = []
 def detect_tilt(dst):
     # get largest contour, use top two points as reference for rotation
     # pass canny
-    _, edge_contours, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    edge_contours, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     recs = []
     areas = {}
     max_area = 0
@@ -227,9 +227,6 @@ def process_image(image, lpr=None):
     rotated_image = ndimage.rotate(cropped_frame, angle, cval=255)
     rotated_thresh = ndimage.rotate(thresh.copy(), angle, cval=255)
 
-    # draw largest contour on image, assuming contour is plate (TODO, limit to closed contour)
-    cv2.drawContours(cropped_frame, [c], -1, (0, 255, 0), 1)
-
     # get updated indices of contour location in rotated image
     indices = np.where(np.all(rotated_image == (0, 255, 0), axis=-1))
     if (len(indices[0]) > 0):
@@ -275,7 +272,7 @@ def process_image(image, lpr=None):
         dst[height - int(height / 5):-1, :] = opened_dst
 
     # dst = cv2.Canny(reduced_thresh, 50, 150)
-    _, contours_upped, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours_upped, hierarchy = cv2.findContours(dst, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     '''
     determine which contours contain letters based off approximate area
@@ -315,6 +312,7 @@ def process_image(image, lpr=None):
     # whitelists only work with legacy, --oem 0
     tess_config = "-c tessedit_char_whitelist=ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 --psm 6"
     text = pytesseract.image_to_string(stencil, config=tess_config, lang="eng")
+    text = text.encode('ascii', 'ignore').decode('ascii')
     print(text)
     db2.write_data(auth_token, text)
     return text

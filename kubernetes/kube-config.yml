@@ -24,6 +24,8 @@ spec:
     - name: ubuntu-ocr
       image: hnmehta/license_ocr:1
       env:
+        - name: DEBUG
+          value: "true"
         - name: CREDENTIALS
           valueFrom:
             secretKeyRef:
@@ -34,4 +36,3 @@ spec:
       tty: true
       command: ["/usr/bin/python3"]
       args: ["ocr_server.py"]
-#      args: ["db2_script.py"]
