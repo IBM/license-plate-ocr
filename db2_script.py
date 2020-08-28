@@ -26,6 +26,7 @@ import json
 import requests
 from datetime import datetime
 import os
+from pytz import timezone
 
 
 class Db2Connection:
@@ -44,9 +45,11 @@ class Db2Connection:
         self.logs_table = "LICENSE_OCR"
         self.employee_details_table = "EMPLOYEE_DETAILS"
 
+        self.tz = timezone('US/Eastern')
         self.date = datetime.today().strftime('%Y-%m-%d')
-        self.time = datetime.now().strftime('%H:%M:%S')
-        self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        self.time = datetime.now(self.tz).strftime('%H:%M:%S')
+        self.timestamp = datetime.now(self.tz).strftime("%Y-%m-%d %H:%M:%S.%f")
+
 
     def authenticate(self):
         """
@@ -239,6 +242,8 @@ class Db2Connection:
         =========================================================================================================
         """
 
+        self.timestamp = datetime.now(self.tz).strftime("%Y-%m-%d %H:%M:%S.%f")
+
         print(BColors.HEADER + "\nLicense Plate {} is entering the location.".format(license_plate)
               + BColors.ENDC)
 
@@ -358,6 +363,8 @@ class Db2Connection:
         @return: None
         =========================================================================================================
         """
+
+        self.timestamp = datetime.now(self.tz).strftime("%Y-%m-%d %H:%M:%S.%f")
 
         print(BColors.HEADER + "\nLicense Plate {} is exiting the location.".format(license_plate) + BColors.ENDC)
 
@@ -479,11 +486,11 @@ class BColors:
 
 def main():
     # Get Credentials
-        # f = open("kubernetes/credentials.txt", "r")
-        # credentials = json.loads(f.read())
-        # f.close()
-    credentials = json.loads(os.environ['CREDENTIALS'])
-    print(credentials)
+    f = open("kubernetes/credentials.txt", "r")
+    credentials = json.loads(f.read())
+    f.close()
+    # credentials = json.loads(os.environ['CREDENTIALS'])
+    # print(credentials)
 
     # Create a Db2Connection Object
     db2 = Db2Connection(credentials)
@@ -502,8 +509,10 @@ def main():
     # Write Data
     # TODO: Ensure that the license_plate, time parameters are passed appropriately
     #  ##### Auth_Token expires after 1 hr. => ensure to renew token every 55 mins
-    license_plate = "22333"
-    db2.write_data(auth_token, license_plate)
+
+    license_plate = ["22333", "AMH C67", "BZMW 067", "IN RS 6333", "12345", "AI VRO90", "BKTP 665"]
+
+    db2.write_data(auth_token, "MPKR 4KU")
 
 
 if __name__ == "__main__":

@@ -181,6 +181,8 @@ def run(server_class=HTTPServer, handler_class=S, addr="0.0.0.0", port=8000):
     httpd.serve_forever()
 
 
+# TODO: Refresh Credentials every 1 hr
+
 # Creating a DB2 Instance
 credentials = json.loads(os.environ['CREDENTIALS'])
 db2 = Db2Connection(credentials)

@@ -26,10 +26,12 @@ from db2_script import Db2Connection, BColors
 #           Cognos
 #   3) Securely store access keys - Auth_Token generated once every hour
 #   4) Application:
-#     # Flag guest license plates > 2 hrs
-#     # Drill on the license plate - to get entire INs and OUTs of the license plate
-#     # Time frame comparison - how many violations over a week (per day)
-
+#     # 1) Flag guest license plates > 2 hrs
+#     # 2) Drill on the license plate - to get entire INs and OUTs of the license plate
+#     #     Create an optional prompt (use prompt as filter to display)
+#     # 3) Time frame comparison - how many violations over a week (per day)
+#     # 4) Summary Dashboard - How many current employees, how many guests and how many violations
+#
 
 # import process_image
 
