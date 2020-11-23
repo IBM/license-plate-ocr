@@ -1,11 +1,11 @@
-# Detect License Plate
+# Read License Plate Numbers Using Object Recognition Services
 
 In this Code Pattern, we will demonstrate how to leverage OCR and the "IBM Maximo Visual Inspection" object recognition service to identify and read license plates.
 
-This use case is ideal for automated "Gate Access Control" in spaces such as a workplace, apartment complex, or mall parking lot.
+This use case is ideal for automated "Gate Access Control" in spaces such as a workplace, apartment complex, or parking lots. Instead of relying on paper tickets, we can automate the checkin/checkout process.
 
 When the reader has completed this Code Pattern, they will understand how to
-- Build a object detection model
+- Build a object detection model in IBM Maximo Visual Inspection
 - Trigger a "post processing" script when specific objects are detected
 - Leverage Python Opencv libraries to prepare an image for OCR
 - Adjust Tesseract OCR to detect specific fonts
