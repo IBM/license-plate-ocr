@@ -1,3 +1,7 @@
+# WARNING: This repository is no longer maintained
+
+> This repository will not be updated. The repository will be kept available in read-only mode.
+
 # Read License Plate Numbers Using Object Recognition Services
 
 In this Code Pattern, we will demonstrate how to leverage OCR and the "IBM Maximo Visual Inspection" object recognition service to identify and read license plates.
